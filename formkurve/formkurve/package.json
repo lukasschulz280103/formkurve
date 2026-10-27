@@ -1,0 +1,21 @@
+{
+  "name": "formkurve",
+  "version": "0.1.0",
+  "description": "Formkurve: persönlicher Fitnessscore und Tagescheck für den Amazfit Helio Strap über Apple Health",
+  "scripts": {
+    "test": "TZ=Europe/Berlin node --test test/*.test.mjs",
+    "build": "node tools/build.mjs",
+    "serve": "node tools/serve.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.24.2",
+    "fflate": "^0.8.2",
+    "htm": "^3.1.1",
+    "preact": "^10.25.4"
+  },
+  "type": "module",
+  "private": true
+}

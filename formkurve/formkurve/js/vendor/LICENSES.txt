@@ -1,0 +1,2 @@
+preact-htm.js: htm/preact standalone build (htm 3.1.1, bundles Preact). MIT License, (c) Jason Miller.
+fflate.js: fflate 0.8.2 ESM browser build. MIT License, (c) Arjun Barrett.
