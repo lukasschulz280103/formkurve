@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Formkurve</title>
+  <meta name="description" content="Persönliche Tagesform, Recovery, Schlaf und Einflussanalyse aus deinen Apple-Health-Daten.">
+  <meta name="theme-color" content="#0c0f14">
+  <meta name="color-scheme" content="dark light">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Formkurve">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+    /* Statusleiste bleibt dunkel, damit die weiße iOS-Schrift lesbar ist */
+    @media (display-mode: standalone) {
+      :root[data-theme="light"] body::before { background: #0c0f14; }
+    }
+    @media (display-mode: standalone) and (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) body::before { background: #0c0f14; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"><div class="loading">Formkurve lädt …</div></div>
+  <noscript><p style="padding:24px">Formkurve braucht JavaScript.</p></noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
