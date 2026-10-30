@@ -1,6 +1,6 @@
 // Service Worker: zuerst Netz (immer aktuelle Dateien), bei fehlendem Netz der Zwischenspeicher.
 // Die Daten (IndexedDB) fasst der Service Worker nie an; ein Update ersetzt nur die App-Dateien.
-const VERSION = '0.3.0';
+const VERSION = '0.7.0';
 const CACHE = `formkurve-${VERSION}`;
 const CORE = ['./', './index.html', './manifest.webmanifest', './css/app.css', './js/main.js', './icons/icon-180.png', './icons/icon.svg'];
 
@@ -25,12 +25,15 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
       .then((res) => {
+        // sync-config.js ist optional: fehlt die Datei, eine leere Antwort statt Fehlermeldung
+        if (res.status === 404 && url.pathname.endsWith('/sync-config.js')) return new Response('', { status: 200, headers: { 'content-type': 'text/javascript' } });
         if (res.ok) {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(req, copy));
         }
         return res;
       })
-      .catch(() => caches.match(req, { ignoreSearch: true }).then((hit) => hit || caches.match('./index.html'))),
+      // Offline: Datei aus dem Zwischenspeicher; nur Seitenaufrufe fallen auf index.html zurück
+      .catch(() => caches.match(req, { ignoreSearch: true }).then((hit) => hit || (req.mode === 'navigate' ? caches.match('./index.html') : Response.error()))),
   );
 });

@@ -1,8 +1,9 @@
 // Kleine Hülle um IndexedDB. Ersatzspeicher im Arbeitsspeicher gibt es nur für Tests und die Vorschau:
 // In der echten App wäre ein stiller Wechsel gefährlich, weil neue Eingaben dann beim Schließen verloren gingen.
-export const STORES = ['raw', 'workouts', 'survey', 'context', 'kv'];
+export const STORES = ['raw', 'workouts', 'survey', 'context', 'kv', 'journal'];
 // Version des Datenbank-Aufbaus. Neue Speicherbereiche werden beim Erhöhen nur ergänzt, nie gelöscht.
-export const DB_VERSION = 1;
+// 1: bis Version 0.4 · 2: Version 0.5, Bereich „journal“ für das Logbuch
+export const DB_VERSION = 2;
 
 let memoryFallback = typeof indexedDB === 'undefined';
 
@@ -126,10 +127,11 @@ class MemStore {
   close() {}
 }
 
-function openOnce(name, timeoutMs) {
+function openOnce(name, timeoutMs, version = DB_VERSION) {
   return new Promise((resolve, reject) => {
     let settled = false;
-    const req = indexedDB.open(name, DB_VERSION);
+    // Ohne Versionsnummer öffnet IndexedDB den vorhandenen Stand (für eine ältere App neben neueren Daten)
+    const req = version ? indexedDB.open(name, version) : indexedDB.open(name);
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
@@ -164,11 +166,15 @@ export async function openStore(name) {
     throw new StorageError('Dieser Browser bietet keinen dauerhaften Speicher.');
   }
   let last = null;
+  let version = DB_VERSION;
   for (const timeout of [6000, 12000]) {
     try {
-      return new IdbStore(await openOnce(name, timeout), name);
+      return new IdbStore(await openOnce(name, timeout, version), name);
     } catch (e) {
       last = e;
+      // Die Datenbank hat schon einen neueren Aufbau (eine neuere App-Version war hier): so öffnen, wie sie ist.
+      // Unbekannte Bereiche bleiben dabei unangetastet.
+      if (e?.name === 'VersionError') version = null;
     }
   }
   if (memoryFallback) {

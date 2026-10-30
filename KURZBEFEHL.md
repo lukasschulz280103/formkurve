@@ -41,7 +41,7 @@ Auch deutsche Datumsangaben (`26.10.2026, 03:12`), Kommazahlen (`0,97`) und deut
 ## Täglich nutzen
 
 1. Kurzbefehl ausführen (Home-Bildschirm, Widget oder Siri: „Formkurve Sync“).
-2. Formkurve öffnen → **Daten** → **Einfügen und importieren**. Lässt iOS die Zwischenablage nicht direkt lesen, lange in das Textfeld tippen → **Einsetzen** → **Text importieren**.
+2. Formkurve öffnen → auf **Heute** im Hinweis **Einfügen und importieren** tippen. Der Hinweis erscheint, solange die letzte Nacht fehlt oder die Daten älter als 20 Stunden sind; sonst **Profil** → **Daten importieren** → **Einfügen und importieren**. Lässt iOS die Zwischenablage nicht direkt lesen, dort lange in das Textfeld tippen → **Einsetzen** → **Text importieren**.
 
 Automation als Tipp: In Kurzbefehle → Automation → „Wecker wird gestoppt“ → Kurzbefehl „Formkurve Sync“ ausführen. Health-Daten sind nur lesbar, wenn das iPhone entsperrt ist.
 
@@ -52,5 +52,5 @@ Automation als Tipp: In Kurzbefehle → Automation → „Wecker wird gestoppt�
 | „Keine verwertbaren Zeilen“ | Prüfe, ob die Text-Aktion wirklich die Eigenschaften einsetzt und nicht nur „Wiederholungsobjekt“ |
 | Typ „nicht erkannt“ | Der Typname erscheint in der Import-Zusammenfassung; melde ihn, dann wird er ergänzt |
 | Kurzbefehl läuft lange | Zeitraum auf „letzten 1 Tag“ verkürzen und täglich ausführen; für die Historie den Health-Export nehmen |
-| HRV landet einen Tag zu früh | In Formkurve unter Daten → Profil den HRV-Tagesversatz auf „+1 Tag“ stellen |
-| Schritte doppelt (iPhone und Strap) | Unter Daten → Quellen „Zepp“ nach oben schieben |
+| HRV landet einen Tag zu früh | In Formkurve unter Profil → Daten importieren den HRV-Tagesversatz auf „+1 Tag“ stellen |
+| Schritte doppelt (iPhone und Strap) | Unter Profil → Daten importieren → Quellen „Zepp“ nach oben schieben |

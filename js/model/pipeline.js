@@ -9,6 +9,7 @@ import {
   fitnessInput, ewmaAlpha, formScore,
 } from './scores.js';
 import { exclusionReason, subjectiveZ, trainingFromSurvey } from '../survey/engine.js';
+import { daySummary, withJournal } from '../journal/journal.js';
 import { buildHints } from './hints.js';
 
 function sleepByDay(index, p) {
@@ -125,11 +126,12 @@ function dedupeWorkouts(workouts, sourceOrder) {
  * Hauptfunktion. Liefert { dates, days: Map(date -> Tageswerte) }.
  * today = lokaler Datumsschlüssel von heute.
  */
-export function computeAll({ index, workouts = [], survey = new Map(), context = new Map(), settings, today }) {
+export function computeAll({ index, workouts = [], survey = new Map(), journal = new Map(), context = new Map(), settings, today }) {
   const m = settings.model;
   const [minD, maxD] = index.dates();
   const surveyDates = [...survey.keys()].sort();
-  const first = [minD, surveyDates[0]].filter(Boolean).sort()[0];
+  const journalDates = [...journal.keys()].sort();
+  const first = [minD, surveyDates[0], journalDates[0]].filter(Boolean).sort()[0];
   if (!first) return { dates: [], days: new Map() };
   const last = [maxD, today].filter(Boolean).sort().pop();
   const dates = rangeKeys(first, last > today ? today : last);
@@ -157,6 +159,7 @@ export function computeAll({ index, workouts = [], survey = new Map(), context =
       ...night,
       excluded: exclusionReason(survey, date),
       survey: rec || null,
+      journal: daySummary(journal.get(date)),
       context: context.get(date) || null,
     });
   }
@@ -191,7 +194,9 @@ export function computeAll({ index, workouts = [], survey = new Map(), context =
     const d = days.get(date);
     const rhrRef = d.base.rhr?.median ?? globalRhr;
     Object.assign(d, dailyActivity(index, workoutsByDay, date, rhrRef, hrMax, m.strain));
-    const tr = trainingFromSurvey(d.survey?.a);
+    // Abendcheck plus Logbuch: was im Logbuch steht, gilt (Training, Koffein, Wasser)
+    d.answers = withJournal(d.survey?.a, journal.get(date), d.workouts);
+    const tr = trainingFromSurvey(d.answers);
     let strength = 0;
     let strengthMin = 0;
     const strengthWorkouts = d.workouts.filter((w) => w.kind === 'kraft');

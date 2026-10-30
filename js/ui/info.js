@@ -56,9 +56,8 @@ export function InfoSheet() {
       ${r.caveat ? html`<p class="small muted">${r.caveat}</p>` : null}
       ${missingProfile && !state.demo ? html`<button class="linkbtn" style="justify-self:start" onClick=${() => {
         closeInfo();
-        navigate('daten');
-        setTimeout(() => document.getElementById('profil')?.scrollIntoView({ block: 'start' }), 80);
-      }}>Alter und Geschlecht im Profil ergänzen</button>` : null}
+        navigate('profil', 'koerper');
+      }}>Alter und Geschlecht in den Körperdaten ergänzen</button>` : null}
       ${r.sources?.length ? html`<div><div class="eyebrow" style="margin-bottom:4px">Quellen</div>
         <ul class="sources">${r.sources.map((s) => html`<li><a href=${s.url} target="_blank" rel="noopener noreferrer">${s.label}</a></li>`)}</ul></div>` : null}
       <p class="tiny muted">Allgemeine Richtwerte, keine Diagnose. Bei Beschwerden zählt ärztlicher Rat.</p>

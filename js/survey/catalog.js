@@ -168,16 +168,16 @@ export const QUESTIONS = [
   { id: 'W2b', mod: 'weekly', prio: 139, type: 'number', text: 'Taillenumfang', min: 40, max: 200, step: 0.5, unit: 'cm', prefill: 'last' },
   { id: 'W4', mod: 'weekly', prio: 140, type: 'text', text: 'Änderung im Leben (Umzug, Job, Prüfung …)' },
   { id: 'W7', mod: 'weekly', prio: 141, type: 'text', text: 'Welche Frage nervt oder ist überflüssig?' },
-
-  { id: 'A12n', mod: 'evening', prio: 200, type: 'text', text: 'Notiz' },
 ];
 
 /**
  * Nicht mehr gestellte Fragen früherer Versionen. Ihre Antworten bleiben gespeichert und werden weiter ausgewertet.
- * E8 (Supplements im Ernährungsmodul) ist in SUP aufgegangen.
+ * E8 (Supplements im Ernährungsmodul) ist in SUP aufgegangen, die Notiz A12n im Tagebuch des Logbuchs
+ * (alte Notizen zeigt das Logbuch beim jeweiligen Tag).
  */
 export const RETIRED = {
   E8: { replacedBy: 'SUP', text: 'Supplements (Standardliste, bis Version 0.2)' },
+  A12n: { replacedBy: 'journal', text: 'Notiz im Abendcheck (bis Version 0.4)' },
 };
 
 export const QUESTION_BY_ID = Object.fromEntries(QUESTIONS.map((q) => [q.id, q]));

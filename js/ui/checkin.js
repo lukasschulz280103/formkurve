@@ -1,7 +1,7 @@
-// Ansicht "Check-in": Kernfragen zuerst, danach optionale Fragen nach Wichtigkeit; Vorbelegung und Nachtragen.
-import { html, useState, useEffect, useMemo } from '../vendor/preact-htm.js';
-import { state, update, saveSurvey, saveSettings, toast, navigate } from './state.js';
-import { Topbar, DemoBanner } from './today.js';
+// Check-in als Blatt über allen Reitern: Kernfragen zuerst, danach optionale Fragen nach Wichtigkeit; Vorbelegung und Nachtragen.
+import { html, useState, useEffect, useMemo, useRef } from '../vendor/preact-htm.js';
+import { state, update, saveSurvey, saveSettings, toast, navigate, openJournal, openCheck, closeCheck, takeCheckOpener, openChecks } from './state.js';
+import { DemoBanner } from './today.js';
 import { Segmented, Stepper } from './components.js';
 import { Icon } from './icons.js';
 import { dayLabel } from './format.js';
@@ -10,12 +10,44 @@ import { setPath } from '../core/config.js';
 import { checkPlan, hiddenByCondition, prefillValue, isAnswered, slotDone, recordOf, DEPTH } from '../survey/engine.js';
 import { QUESTIONS, MODULES, NONE } from '../survey/catalog.js';
 import { SUPPLEMENT_GROUPS, STARTER, allSupplements, supplementLabel, recentSupplements, customId } from '../survey/supplements.js';
+import { journalAnswers, daySummary, clockOf, SPORT_BY_ID, DAY_START_HOUR } from '../journal/journal.js';
+import { liters } from './journalView.js';
+import { num } from './format.js';
+
+/** Was das Logbuch an diesem Tag schon beantwortet; diese Fragen entfallen im Abendcheck. */
+function FromJournal({ date, jd, rec }) {
+  const s = daySummary(rec) || {};
+  const a = jd.answers;
+  const rows = [];
+  if (jd.covered.has('A6')) rows.push(['Getrunken', liters(s.waterMl)]);
+  if (jd.covered.has('A4')) rows.push(['Koffein', a.A4 === 0 ? 'keins' : `${a.A4} ${a.A4 === 1 ? 'Getränk' : 'Getränke'} · ${num(s.caffeineMg)} mg · zuletzt ${clockOf(a.A4t)}`]);
+  if (jd.covered.has('A7')) rows.push(['Training', `${(a.T1 || []).map((k) => SPORT_BY_ID[k]?.label || k).join(', ')} · ${a.T13} min${a.T2 != null ? ` · Anstrengung ${a.T2}` : ''}`]);
+  if (!rows.length) return null;
+  return html`<section class="card j-from" aria-labelledby="j-from-h">
+    <div class="section-title"><h2 id="j-from-h">Aus dem Logbuch</h2><button type="button" class="linkbtn" style="padding:0" onClick=${() => openJournal(date)}>Ändern</button></div>
+    <dl class="kv">${rows.map(([k, v]) => html`<dt>${k}</dt><dd>${v}</dd>`)}</dl>
+    <p class="tiny muted">Diese Fragen entfallen heute. Es zählt, was im Logbuch steht.</p>
+  </section>`;
+}
+
+/**
+ * Welcher Check gerade dran ist. Nach Mitternacht (bis 4 Uhr, wie im Logbuch) gehört der Abend noch zum Vortag;
+ * der Morgencheck kommt erst nach dem Aufstehen.
+ */
+export function currentCheck(now = new Date()) {
+  const repo = state.repo;
+  const h = now.getHours();
+  const today = state.today;
+  if (h < DAY_START_HOUR) {
+    const y = addDays(today, -1);
+    return { slot: 'evening', date: y, due: !slotDone(repo.survey, y, 'evening') };
+  }
+  if (h < repo.settings.survey.morningUntilHour && !slotDone(repo.survey, today, 'morning')) return { slot: 'morning', date: today, due: true };
+  return { slot: 'evening', date: today, due: h >= 18 && !slotDone(repo.survey, today, 'evening') };
+}
 
 function defaultSlot() {
-  if (state.checkSlot) return state.checkSlot;
-  const h = new Date().getHours();
-  const morningDone = slotDone(state.repo.survey, state.today, 'morning');
-  return h < state.repo.settings.survey.morningUntilHour && !morningDone ? 'morning' : 'evening';
+  return state.checkSlot || currentCheck().slot;
 }
 
 function ScaleInput({ q, value, onChange }) {
@@ -139,24 +171,61 @@ function Question({ q, value, prefilled, onChange, tag, boosted }) {
   </div>`;
 }
 
-export function CheckView() {
+// Angefangene Antworten je Zeitpunkt und Tag: Wer das Blatt schließt oder kurz ins Logbuch springt, verliert nichts.
+const drafts = new Map();
+
+/** Check-in als Blatt über dem aktuellen Reiter (Morgen- und Abendcheck, Nachtragen der letzten Tage). */
+export function CheckSheet() {
   const repo = state.repo;
   const settings = repo.settings;
   const today = state.today;
   const [slot, setSlot] = useState(defaultSlot);
-  const [date, setDate] = useState(state.checkDate || today);
-  const [draft, setDraft] = useState({});
+  const [date, setDate] = useState(() => state.checkDate || (state.checkSlot ? today : currentCheck().date));
+  const key = `${slot}|${date}`;
+  const [draft, setDraftState] = useState(() => drafts.get(key) || {});
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const ref = useRef(null);
+
+  const setDraft = (fn) => setDraftState((d) => {
+    const next = typeof fn === 'function' ? fn(d) : fn;
+    if (Object.keys(next).length) drafts.set(key, next);
+    else drafts.delete(key);
+    return next;
+  });
 
   useEffect(() => {
     if (state.checkSlot || state.checkDate) update({ checkSlot: null, checkDate: null });
+    // Seite dahinter festhalten, Fokus ins Blatt, Escape schließt
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const back = takeCheckOpener();
+    const where = `${state.route}/${state.sub}`;
+    ref.current?.focus();
+    const onKey = (e) => {
+      if (e.key === 'Escape' && !state.info) closeCheck();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener('keydown', onKey);
+      // Erst nach dem Neuzeichnen, wenn der Hintergrund wieder bedienbar ist; nicht nach einem Wechsel des Reiters
+      setTimeout(() => {
+        if (back?.isConnected && `${state.route}/${state.sub}` === where) back.focus?.({ preventScroll: true });
+      }, 0);
+    };
   }, []);
 
   const record = recordOf(repo.survey, date);
+  const first = useRef(true);
   useEffect(() => {
-    setDraft({});
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    setDraftState(drafts.get(key) || {});
     setExpanded(false);
+    ref.current?.scrollTo?.(0, 0);
   }, [slot, date]);
 
   const day = state.results.days.get(date);
@@ -171,9 +240,13 @@ export function CheckView() {
     return out;
   }, [slot, date, state.version]);
 
+  // Abends: Was im Logbuch steht (Wasser, Koffein, Training), fragt der Check nicht noch einmal
+  const jrec = repo.journal.get(date) || null;
+  const jd = slot === 'evening' ? journalAnswers(jrec, day?.workouts || []) : { answers: {}, covered: new Set() };
   const answers = { ...prefills, ...base, ...draft };
   for (const [k, v] of Object.entries(draft)) if (v === undefined) delete answers[k];
-  const plan = checkPlan(slot, answers, { date, settings, survey: repo.survey });
+  Object.assign(answers, jd.answers);
+  const plan = checkPlan(slot, answers, { date, settings, survey: repo.survey, covered: jd.covered });
   const depth = DEPTH[settings.survey.depth] ?? DEPTH.standard;
   // Schon beantwortete optionale Fragen bleiben sichtbar, auch wenn sie sonst eingeklappt wären
   const answeredOpt = plan.optional.filter((x) => isAnswered(base[x.q.id]) || x.q.id in draft);
@@ -198,27 +271,35 @@ export function CheckView() {
         out[q.id] = isAnswered(v) ? v : undefined;
       }
       // Folgefragen, deren Bedingung nicht mehr gilt (z. B. Alkohol jetzt „Nein“): alte Antwort entfernen
-      for (const q of hiddenByCondition(slot, answers, { date, settings, survey: repo.survey })) if (base[q.id] !== undefined) out[q.id] = undefined;
+      for (const q of hiddenByCondition(slot, answers, { date, settings, survey: repo.survey, covered: jd.covered })) if (base[q.id] !== undefined) out[q.id] = undefined;
       const h = new Date().getHours();
       const backfilled = slot === 'morning' ? date < today : date < addDays(today, -1) || (date === addDays(today, -1) && h >= 12);
       await saveSurvey(date, slot, out, backfilled);
-      setDraft({});
+      drafts.delete(key);
       toast(slot === 'morning' ? 'Morgencheck gespeichert' : 'Abendcheck gespeichert');
+      // Nach dem Morgencheck gleich die Scores zeigen
       if (slot === 'morning' && date === today) navigate('heute');
+      else closeCheck();
     } catch (e) {
       console.error(e);
       toast('Speichern fehlgeschlagen', 'error');
-    } finally {
       setSaving(false);
     }
   }
 
   const isPrefilled = (q) => !(q.id in draft) && base[q.id] === undefined && prefills[q.id] !== undefined;
   const seconds = Math.max(10, Math.round((plan.core.length * 5) / 5) * 5);
+  const pending = Object.keys(draft).length;
 
-  return html`
-    <${Topbar} title="Check-in" sub=${`${slot === 'morning' ? 'Morgencheck' : 'Abendcheck'} · ${dayLabel(date, today)}`} />
-    <main class="view">
+  return html`<div class="check-sheet" role="dialog" aria-modal="true" aria-labelledby="check-title" tabindex="-1" ref=${ref}>
+    <header class="sheet-head">
+      <div class="grow">
+        <h1 id="check-title">Check-in</h1>
+        <div class="sub">${slot === 'morning' ? 'Morgencheck' : 'Abendcheck'} · ${dayLabel(date, today)}${pending ? ' · nicht gespeichert' : ''}</div>
+      </div>
+      <button type="button" class="iconbtn" aria-label=${pending ? 'Schließen, Eingaben bleiben bis zum Speichern erhalten' : 'Schließen'} onClick=${closeCheck}><${Icon} name="close" /></button>
+    </header>
+    <div class="view sheet-body">
       <${DemoBanner} />
       <div class="check-head">
         <${Segmented} label="Zeitpunkt" value=${slot} onChange=${setSlot} options=${[{ value: 'morning', label: 'Morgen' }, { value: 'evening', label: 'Abend' }]} />
@@ -229,6 +310,7 @@ export function CheckView() {
         ${done ? html`<p class="small muted">Bereits gespeichert. Änderungen überschreiben die Antworten dieses Tages.</p>` : null}
         ${date !== today ? html`<p class="small muted">Nachgetragene Antworten werden markiert, weil die Erinnerung mit der Zeit ungenauer wird.</p>` : null}
       </div>
+      ${slot === 'evening' ? html`<${FromJournal} date=${date} jd=${jd} rec=${jrec} />` : null}
       <section class="card" aria-labelledby="m-core">
         <div class="section-title"><h2 id="m-core">Kernfragen</h2><span class="tiny muted">etwa ${seconds} Sekunden</span></div>
         <p class="small muted" style="margin-bottom:6px">${slot === 'morning' ? 'Direkt nach dem Aufwachen, bevor du die Scores siehst.' : 'Was heute war. Beeinflusst die kommende Nacht.'}</p>
@@ -241,9 +323,44 @@ export function CheckView() {
         ${moreCount > 0 ? html`<button type="button" class="btn block ghost" style="margin-top:10px" onClick=${() => setExpanded(true)}><${Icon} name="plus" size=${16} />Weitere Fragen (${moreCount})</button>`
           : expanded && plan.optional.length > firstOpt.length ? html`<button type="button" class="btn block ghost" style="margin-top:10px" onClick=${() => setExpanded(false)}>Weniger anzeigen</button>` : null}
       </section>` : null}
+      ${slot === 'evening' ? html`<section class="card row between" style="gap:12px">
+        <div class="grow"><h3>Tagebuch</h3><p class="small muted">Notizen zum Tag schreibst du im Logbuch. Deine Antworten hier bleiben bis zum Speichern erhalten.</p></div>
+        <button type="button" class="btn small" onClick=${() => openJournal(date)}><${Icon} name="pen" size=${16} />Schreiben</button>
+      </section>` : null}
       <div class="savebar">
         <div class="grow">${answeredCount} von ${plan.core.length} Kernfragen${answeredCount < plan.core.length ? ' · Leeres bleibt leer, nicht „Nein“' : ''}</div>
         <button class="btn primary" disabled=${saving} onClick=${save}>${done ? 'Aktualisieren' : 'Speichern'}</button>
       </div>
-    </main>`;
+    </div>
+  </div>`;
+}
+
+/** Schwebender Knopf in allen Reitern; zeigt, wenn ein Check fällig ist. Beim Herunterscrollen schrumpft er auf das Symbol. */
+export function CheckFab() {
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    let last = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (Math.abs(y - last) < 12) return;
+      setCompact(y > last && y > 120);
+      last = y;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  // Bleibt unter dem offenen Blatt bestehen, damit der Fokus beim Schließen hierher zurückfindet
+  if (!state.repo) return null;
+  const cur = currentCheck();
+  const open = openChecks();
+  const label = cur.due ? (cur.slot === 'morning' ? 'Morgencheck' : 'Abendcheck') : null;
+  // Was jetzt dran ist; sonst der neueste offene Check, zum Beispiel der Morgencheck am Nachmittag
+  const target = cur.due ? cur : open[0] || cur;
+  const n = open.length;
+  return html`<button type="button" class=${`fab${label ? ' due' : ''}${compact ? ' compact' : ''}`}
+    aria-label=${`${label ? `${label} öffnen, fällig` : 'Check-in öffnen'}${n ? `, ${n} ${n === 1 ? 'Check offen' : 'Checks offen'}` : ''}`}
+    onClick=${() => openCheck(target.slot, target.date)}>
+    <${Icon} name="check" size=${22} />${label ? html`<span>${label}</span>` : null}
+    ${n ? html`<span class="fab-badge" aria-hidden="true">${n > 9 ? '9+' : n}</span>` : null}
+  </button>`;
 }

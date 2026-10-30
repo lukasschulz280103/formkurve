@@ -91,3 +91,20 @@ test('Einflussanalyse findet die eingebauten Effekte', async () => {
   const strong = ins.results.filter((r) => r.confidence !== 'gering');
   assert.ok(strong.length >= 5 && strong.length < ins.results.length / 2, `${strong.length} von ${ins.results.length}`);
 });
+
+test('Logbuch im Modell: Antworten aus dem Logbuch, Glück als Zielwert in den Einsichten', async () => {
+  const withJ = computeAll({ index, workouts: demo.workouts, survey: demo.survey, journal: demo.journal, context: demo.context, settings, today: END });
+  const d = withJ.days.get(addDays(END, -6));
+  assert.ok(d.journal && d.journal.waterMl > 0 && d.journal.happy != null, 'Tageswerte aus dem Logbuch');
+  const a = demo.survey.get(addDays(END, -6))?.a;
+  if (a?.A4 !== undefined) assert.equal(d.answers.A4, a.A4, 'Logbuch und Abendcheck passen in den Beispieldaten zusammen');
+  const ins = await computeInsights({ dates: withJ.dates, days: withJ.days, survey: demo.survey, journal: demo.journal, settings });
+  const find = (f, t) => ins.results.find((r) => r.factor === f && r.target === t);
+  const stress = find('stressH', 'happy');
+  assert.ok(stress && stress.diff < 0 && stress.confidence !== 'gering', JSON.stringify(stress && { diff: stress.diff, q: stress.q }));
+  const sport = find('sportH', 'happy');
+  assert.ok(sport && sport.diff > 0 && sport.confidence !== 'gering', JSON.stringify(sport && { diff: sport.diff, q: sport.q }));
+  const caf = find('cafLate', 'latency');
+  assert.ok(caf && caf.diff > 5 && caf.confidence !== 'gering', 'eingebaute Effekte bleiben sichtbar');
+  assert.equal(ins.counts.journal, demo.journal.size);
+});

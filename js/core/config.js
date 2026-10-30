@@ -15,6 +15,8 @@ export const DEFAULTS = {
     theme: 'auto', // auto | dark | light
     hideScoresUntilMorning: true,
     profileHintDismissed: false,
+    formPeriod: 'week', // Tagesform im Schnitt auf „Heute“: week | month
+    calendarMetric: 'form', // Wert, nach dem der Monatskalender die Tage einfärbt
   },
   import: {
     hrvDayShift: 0, // 0 oder 1 Tag (bekannter Zepp-Versatz)
@@ -63,6 +65,14 @@ export const DEFAULTS = {
     sensitive: false,
     backfillDays: 3,
     morningUntilHour: 14,
+  },
+  journal: {
+    // Startwert fürs Trinkziel: zwischen den DGE-Richtwerten für Getränke (rund 1,5 l) und dem
+    // Gesamtwasser laut EFSA (2,0 l Frauen, 2,5 l Männer, inklusive Wasser aus dem Essen)
+    waterGoalMl: 2000,
+    glassMl: 250,
+    bottleMl: 500,
+    showOnToday: true,
   },
   analysis: { minN: 10, permutations: 2000, bootstrap: 1000, qThreshold: 0.1 },
   context: { enabled: false, auto: false, place: null },

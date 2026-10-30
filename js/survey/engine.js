@@ -86,10 +86,11 @@ function contextFor(answers, { date, settings, survey }) {
 /**
  * Plan für einen Check: Kernfragen (immer sichtbar, Folgefragen direkt nach ihrer Ausgangsfrage) und
  * optionale Fragen nach Wichtigkeit sortiert. Bereiche, die heute vorgeschlagen sind, rücken nach vorn.
+ * covered: Fragen, die das Logbuch an diesem Tag schon beantwortet; sie fallen weg.
  */
-export function checkPlan(slot, answers, { date, settings, survey = null }) {
+export function checkPlan(slot, answers, { date, settings, survey = null, covered = null }) {
   const ctx = contextFor(answers, { date, settings, survey });
-  const shown = (q) => MODULES[q.mod]?.slot === slot && moduleAvailable(q.mod, ctx) && (!q.when || q.when(answers, ctx));
+  const shown = (q) => MODULES[q.mod]?.slot === slot && !covered?.has(q.id) && moduleAvailable(q.mod, ctx) && (!q.when || q.when(answers, ctx));
   const isCore = (q) => q.prio === 'core' || Boolean(q.coreWhen?.(answers, ctx));
   const visible = QUESTIONS.filter(shown);
   const coreQs = visible.filter(isCore);
@@ -111,9 +112,9 @@ export function checkPlan(slot, answers, { date, settings, survey = null }) {
 }
 
 /** Fragen dieses Zeitpunkts, die wegen ihrer Bedingung gerade nicht gelten (deren alte Antworten verfallen). */
-export function hiddenByCondition(slot, answers, { date, settings, survey = null }) {
+export function hiddenByCondition(slot, answers, { date, settings, survey = null, covered = null }) {
   const ctx = contextFor(answers, { date, settings, survey });
-  return QUESTIONS.filter((q) => MODULES[q.mod]?.slot === slot && q.when && !q.when(answers, ctx));
+  return QUESTIONS.filter((q) => MODULES[q.mod]?.slot === slot && !covered?.has(q.id) && q.when && !q.when(answers, ctx));
 }
 
 export function isAnswered(v) {
@@ -137,6 +138,32 @@ export function exclusionReason(survey, date) {
 export function backfillAllowed(date, today, settings) {
   const d = diffDays(date, today);
   return d >= 0 && d <= (settings?.survey?.backfillDays ?? 3);
+}
+
+/** Ab dieser Stunde gilt der Morgencheck als offen (davor läuft noch die Nacht davor, wie im Logbuch). */
+export const MORNING_FROM_HOUR = 4;
+/** Ab dieser Stunde gilt der Abendcheck als offen. */
+export const EVENING_FROM_HOUR = 18;
+
+/**
+ * Noch offene Checks im Nachtragefenster, der neueste zuerst: je Tag Morgen und Abend,
+ * sobald der Zeitpunkt vorbei ist. `since` lässt Tage weg, an denen es das Konto noch nicht gab.
+ */
+export function pendingChecks(survey, { settings, today, now = new Date(), since = null } = {}) {
+  const out = [];
+  const back = settings?.survey?.backfillDays ?? 3;
+  const h = now.getHours();
+  for (let i = 0; i <= back; i++) {
+    const date = addDays(today, -i);
+    if (since && date < since) break;
+    for (const slot of ['morning', 'evening']) {
+      if (slotDone(survey, date, slot)) continue;
+      // Heute zählt nur, was schon dran war
+      if (date === today && h < (slot === 'morning' ? MORNING_FROM_HOUR : EVENING_FROM_HOUR)) continue;
+      out.push({ date, slot });
+    }
+  }
+  return out;
 }
 
 /** Subjektiver Wert für die Recovery aus dem Morgencheck (-3 bis +3) oder null. */

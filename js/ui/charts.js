@@ -1,6 +1,24 @@
 // Zeitreihen-Diagramm (Linien, Balken, Normalbereich) mit Fadenkreuz-Tooltip und Tastaturbedienung.
 import { html, useRef, useState, useEffect, useLayoutEffect } from '../vendor/preact-htm.js';
 import { dateShort, dateLong, num } from './format.js';
+import { weekday } from '../core/time.js';
+
+/** Zusammenhängende Wochenend-Spalten (Sa, So) als [erster, letzter] Index. */
+export function weekendRuns(dates) {
+  const runs = [];
+  let start = null;
+  dates.forEach((d, i) => {
+    const wd = weekday(d);
+    const we = wd === 0 || wd === 6;
+    if (we && start === null) start = i;
+    if (!we && start !== null) {
+      runs.push([start, i - 1]);
+      start = null;
+    }
+  });
+  if (start !== null) runs.push([start, dates.length - 1]);
+  return runs;
+}
 
 function useWidth(ref, fallback = 340) {
   const [w, setW] = useState(fallback);
@@ -64,7 +82,7 @@ function barPath(x, w, y0, y1) {
  * series: [{ key, label, values, color, type: 'line'|'bar', colorFn?, strong? }]
  * band: { lo, hi, label } in y-Einheiten
  */
-export function TimeChart({ dates, series, band = null, yDomain, yTicks, height = 168, fmt = (v) => num(v), tickFmt = null, refLines = [], label = 'Diagramm', endLabel = true }) {
+export function TimeChart({ dates, series, band = null, yDomain, yTicks, height = 168, fmt = (v) => num(v), tickFmt = null, refLines = [], label = 'Diagramm', endLabel = true, weekends = true }) {
   const ref = useRef(null);
   const width = useWidth(ref);
   const [hover, setHover] = useState(null);
@@ -121,6 +139,7 @@ export function TimeChart({ dates, series, band = null, yDomain, yTicks, height 
   return html`<div class="chart" ref=${ref} tabindex="0" role="img" aria-label=${label}
       onPointerMove=${onMove} onPointerDown=${onMove} onPointerLeave=${() => setHover(null)} onKeyDown=${onKey} onBlur=${() => setHover(null)}>
     <svg viewBox=${`0 0 ${width} ${height}`} height=${height} preserveAspectRatio="none">
+      ${weekends ? weekendRuns(dates).map(([a, b]) => html`<rect class="weekend" x=${m.l + a * step} y=${m.t} width=${(b - a + 1) * step} height=${ph} />`) : null}
       ${ticks.map((t) => html`<line class=${t === y0 ? 'base' : 'grid'} x1=${m.l} x2=${m.l + pw} y1=${y(t)} y2=${y(t)} />
         <text class="tick-label" x=${m.l - 6} y=${y(t)} dy="0.32em" text-anchor="end">${(tickFmt || fmt)(t)}</text>`)}
       ${band && bandPaths(xs, band.lo, band.hi, y).map((d) => html`<path class="band" d=${d} />`)}
@@ -146,6 +165,62 @@ export function TimeChart({ dates, series, band = null, yDomain, yTicks, height 
       </div>`)}
       ${band && isNum(band.lo[hover]) && html`<div class="tt-row"><i></i><span class="muted">${band.label || 'Normal'}: ${fmt(band.lo[hover])}–${fmt(band.hi[hover])}</span><span></span></div>`}
     </div>`}
+  </div>`;
+}
+
+/**
+ * Säulen je Woche oder Monat (Durchschnitt eines Tageswerts) mit Zonenlinien, Tooltip und Tastaturbedienung.
+ * periods: [{ label, range, mean, min, max, n, partial }]
+ */
+export function PeriodChart({ periods, yDomain = [0, 100], yTicks = null, refLines = [], height = 176, fmt = (v) => num(v), label = 'Diagramm', unitWord = 'Woche' }) {
+  const ref = useRef(null);
+  const width = useWidth(ref);
+  const [hover, setHover] = useState(null);
+  const n = periods.length;
+  const m = { l: 34, r: 8, t: 20, b: 24 };
+  const pw = Math.max(10, width - m.l - m.r);
+  const ph = height - m.t - m.b;
+  const step = pw / Math.max(1, n);
+  const bw = Math.max(4, Math.min(24, step * 0.62));
+  const [y0, y1] = yDomain;
+  const y = (v) => m.t + ph - ((v - y0) / (y1 - y0 || 1)) * ph;
+  const ticks = yTicks || niceTicks(y0, y1);
+  const xs = periods.map((_, i) => m.l + (i + 0.5) * step);
+  const labelIdx = xLabelIndices(n, pw);
+  const withData = periods.map((p, i) => (p.mean != null ? i : -1)).filter((i) => i >= 0);
+  const valueLabels = new Set(withData.slice(-2));
+  useEffect(() => setHover(null), [n, periods[0]?.key]);
+  const onMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * width;
+    const i = Math.floor((x - m.l) / step);
+    if (i >= 0 && i < n) setHover(i);
+  };
+  const onKey = (e) => {
+    if (e.key === 'ArrowLeft') setHover((h) => Math.max(0, (h ?? n) - 1));
+    else if (e.key === 'ArrowRight') setHover((h) => Math.min(n - 1, (h ?? -1) + 1));
+    else if (e.key === 'Escape') setHover(null);
+    else return;
+    e.preventDefault();
+  };
+  const p = hover != null ? periods[hover] : null;
+  const tipLeft = hover == null ? 0 : Math.min(Math.max(xs[hover] - 80, 0), width - 170);
+  return html`<div class="chart" ref=${ref} tabindex="0" role="img" aria-label=${label}
+      onPointerMove=${onMove} onPointerDown=${onMove} onPointerLeave=${() => setHover(null)} onKeyDown=${onKey} onBlur=${() => setHover(null)}>
+    <svg viewBox=${`0 0 ${width} ${height}`} height=${height} preserveAspectRatio="none">
+      ${ticks.map((t) => html`<line class=${t === y0 ? 'base' : 'grid'} x1=${m.l} x2=${m.l + pw} y1=${y(t)} y2=${y(t)} />
+        <text class="tick-label" x=${m.l - 6} y=${y(t)} dy="0.32em" text-anchor="end">${fmt(t)}</text>`)}
+      ${refLines.filter((r) => isNum(r.y) && r.y > y0 && r.y < y1).map((r) => html`<line class="ref" x1=${m.l} x2=${m.l + pw} y1=${y(r.y)} y2=${y(r.y)} />`)}
+      ${periods.map((q, i) => (q.mean == null ? null : html`<path class=${`pbar${q.partial ? ' partial' : ''}`} d=${barPath(xs[i] - bw / 2, bw, y(y0), y(Math.max(q.mean, y0)))} style=${hover == null || hover === i ? '' : 'opacity:0.5'} />`))}
+      ${periods.map((q, i) => (valueLabels.has(i) && hover == null ? html`<text class="end-label" x=${xs[i]} y=${y(q.mean) - 6} text-anchor="middle">${fmt(q.mean)}</text>` : null))}
+      ${labelIdx.map((i) => html`<text class="tick-label" x=${xs[i]} y=${height - 6} text-anchor="middle">${periods[i].label}</text>`)}
+    </svg>
+    ${p ? html`<div class="tooltip" style=${`left:${tipLeft}px`}>
+      <div class="tt-date">${p.label} · ${p.range}${p.partial ? ' · läuft noch' : ''}</div>
+      <div class="tt-row"><i></i><b>${p.mean == null ? '–' : `Ø ${fmt(p.mean)}`}</b><span>${p.n} ${p.n === 1 ? 'Tag' : 'Tage'} mit Wert</span></div>
+      ${p.n > 1 ? html`<div class="tt-row"><i></i><span class="muted">Spanne ${fmt(p.min)} bis ${fmt(p.max)}</span><span></span></div>` : null}
+    </div>` : null}
+    <span class="sr">${periods.map((q) => `${q.label}: ${q.mean == null ? 'keine Werte' : `Durchschnitt ${fmt(q.mean)}`}`).join('; ')}. Je ${unitWord} der Durchschnitt.</span>
   </div>`;
 }
 

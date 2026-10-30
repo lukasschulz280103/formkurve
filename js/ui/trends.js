@@ -1,6 +1,6 @@
 // Ansicht "Verlauf": Tagesform, Recovery, Schlaf, Strain, Balance, HRV und Ruhepuls über die Zeit.
 import { html, useState } from '../vendor/preact-htm.js';
-import { state } from './state.js';
+import { state, openJournal } from './state.js';
 import { Topbar, DemoBanner } from './today.js';
 import { TimeChart, Legend, DataTable } from './charts.js';
 import { Segmented } from './components.js';
@@ -14,14 +14,14 @@ const lastOf = (arr) => {
   return null;
 };
 
-const RANGES = [
+export const RANGES = [
   { value: 14, label: '14 T' },
   { value: 30, label: '30 T' },
   { value: 90, label: '90 T' },
   { value: 0, label: 'Alle' },
 ];
 
-function ChartCard({ id, title, sub, legend, children, table, info }) {
+export function ChartCard({ id, title, sub, legend, children, table, info }) {
   const [showTable, setShowTable] = useState(false);
   return html`<section class="card" aria-labelledby=${`h-${id}`}>
     <div class="card-head">
@@ -81,6 +81,7 @@ export function TrendsView() {
     <main class="view">
       <${DemoBanner} />
       <${Segmented} label="Zeitraum" options=${RANGES} value=${range} onChange=${setRange} />
+      <p class="tiny muted" style="margin:-4px 2px 0"><i class="weekend-key" aria-hidden="true"></i>Hinterlegt: Wochenende (Sa, So). Nachtwerte zählen zum Tag des Aufwachens.</p>
       <${ChartCard} id="form" info=${{ k: 'form', value: lastOf(form) }} title="Tagesform und Langzeit-Fitness" sub="Tagesform reagiert in Tagen, Fitness in Wochen"
         legend=${[{ label: 'Tagesform', color: 'var(--ink)' }, { label: 'Langzeit-Fitness', color: 'var(--muted)' }]}
         table=${{ dates, columns: [{ label: 'Tagesform', values: form, fmt: f0 }, { label: 'Fitness', values: fit, fmt: f0 }] }}>
@@ -141,5 +142,9 @@ export function TrendsView() {
         table=${{ dates, columns: [{ label: 'PM2,5', values: pm25, fmt: f1 }] }}>
         <${TimeChart} label="Feinstaub PM2,5" dates=${dates} refLines=${[{ y: 15 }]} yDomain=${[0, Math.max(20, ...pm25.filter((x) => x != null)) * 1.1]} series=${[{ key: 'pm', label: 'PM2,5', values: pm25, color: 'var(--ink)' }]} fmt=${f1} tickFmt=${f0} />
       <//>` : null}
+      ${state.repo.journal.size ? html`<section class="card row between" style="gap:12px">
+        <div class="grow"><h3>Logbuch</h3><p class="small muted">Wasser, Koffein, Glück, Sport und Arbeit im Verlauf.</p></div>
+        <button class="btn small" onClick=${() => openJournal(null, 'rueckblick')}><${Icon} name="book" size=${16} />Rückblick</button>
+      </section>` : null}
     </main>`;
 }

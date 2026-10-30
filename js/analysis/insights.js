@@ -5,6 +5,7 @@ import { isNum, mean, sd, permutationTest, bootstrapDiffCI, benjaminiHochberg, m
 import { effectiveAnswers } from '../survey/engine.js';
 import { SUPPLEMENTS, allSupplements, supplementTargets, supplementsOf } from '../survey/supplements.js';
 import { isHoliday, moonAge } from '../context/calendar.js';
+import { journalAnswers, sportSessions, isEmptyDay } from '../journal/journal.js';
 
 const LAT_SUBJ = { lt15: 10, '15-30': 22, '30-60': 45, gt60: 75 };
 
@@ -21,6 +22,8 @@ export const TARGETS = {
   asleep: { label: 'Schlafdauer', unit: 'min', better: 'up', get: (d) => d.sleep?.asleepMin ?? null },
   wake: { label: 'Aufwachphasen', unit: '', better: 'down', get: (d) => d.sleep?.wakeEpisodes ?? null },
   feel: { label: 'Gefühl am Morgen (1–5)', unit: 'Punkte (1–5)', short: 'Pkt.', better: 'up', get: (d) => (typeof d.survey?.a?.M1 === 'number' ? d.survey.a.M1 : null) },
+  // Tageswert aus dem Logbuch: gilt für den Tag, nicht für eine Nacht
+  happy: { label: 'Glück (0–10)', unit: 'Punkte (0–10)', short: 'Pkt.', better: 'up', day: true, get: (d) => (isNum(d.journal?.happy) ? d.journal.happy : null) },
 };
 
 const SLEEPT = ['sleepScore', 'deep', 'latency', 'latencySubj'];
@@ -40,7 +43,7 @@ function multiOpt(qid, opt, group, label, targets, extra) {
 
 export const FACTORS = [
   // Gewohnheiten (Abendcheck)
-  F('alc', 'Gewohnheiten', 'Alkohol getrunken', (c) => c.a.A3, (v) => v === true, (v) => v === false, ['hrv', 'rhr', 'recovery', 'rem', 'deep', 'sleepScore', 'feel'], { aLabel: 'mit Alkohol', bLabel: 'ohne' }),
+  F('alc', 'Gewohnheiten', 'Alkohol getrunken', (c) => c.a.A3, (v) => v === true, (v) => v === false, ['hrv', 'rhr', 'recovery', 'rem', 'deep', 'sleepScore', 'feel', 'happy'], { aLabel: 'mit Alkohol', bLabel: 'ohne' }),
   F('alc2', 'Gewohnheiten', '2 oder mehr alkoholische Getränke', (c) => (c.a.A3 === false ? 0 : c.a.A3 === true ? c.a.X1 : undefined), (v) => isNum(v) && v >= 2, (v) => v === 0, ['hrv', 'rhr', 'recovery', 'rem'], { aLabel: '2+ Getränke', bLabel: 'keine', dose: [[0, '0'], [1, '1'], [2, '2'], [3, '3+']] }),
   F('alcLate', 'Gewohnheiten', 'Letztes Getränk nach 22 Uhr', (c) => (c.a.A3 === true ? time(c.a.X2) : undefined), (v) => isNum(v) && v >= 22 * 60, (v) => isNum(v) && v < 22 * 60, ['hrv', 'rhr', 'rem'], { aLabel: 'nach 22 Uhr', bLabel: 'früher' }),
   F('cafLate', 'Gewohnheiten', 'Koffein nach 14 Uhr', (c) => (c.a.A4 === 0 ? -1 : (c.a.A4 ?? 0) > 0 ? time(c.a.A4t) : undefined), (v) => isNum(v) && v >= 14 * 60, (v) => v === -1 || (isNum(v) && v < 14 * 60), ['latency', 'latencySubj', 'deep', 'sleepScore', 'efficiency'], { aLabel: 'nach 14 Uhr', bLabel: 'früher oder keins' }),
@@ -127,6 +130,26 @@ export const FACTORS = [
   F('allergy', 'Gesundheit', 'Allergiebeschwerden', (c) => c.a.G2, (v) => v === 'leicht' || v === 'stark', (v) => v === 'keine', ['sleepScore', 'hrv', 'rhr'], { lag: 0, allowExcluded: true }),
   F('pain', 'Gesundheit', 'Schmerzen (4 von 10 oder mehr)', (c) => c.a.G4, (v) => isNum(v) && v >= 4, (v) => isNum(v) && v <= 1, ['sleepScore', 'wake'], { lag: 0, allowExcluded: true }),
 
+  // Logbuch: Mengen und Tageswerte, Wirkung in der Nacht danach
+  F('workLong', 'Logbuch', 'Langer Arbeitstag (ab 9 h)', (c) => c.j?.work, (v) => isNum(v) && v >= 9, (v) => isNum(v) && v <= 8, ['hrv', 'rhr', 'recovery', 'sleepScore', 'latency', 'latencySubj'], { aLabel: 'ab 9 h', bLabel: 'bis 8 h' }),
+  F('cafMg', 'Logbuch', 'Mehr als 300 mg Koffein', (c) => c.j?.caffeineMg, (v) => isNum(v) && v > 300, (v) => isNum(v) && v <= 100, ['latency', 'latencySubj', 'deep', 'sleepScore', 'hrv'], { aLabel: 'über 300 mg', bLabel: 'bis 100 mg', dose: [[0, '≤ 100'], [101, '≤ 200'], [201, '≤ 300'], [301, '> 300']] }),
+  F('happyDay', 'Logbuch', 'Glücklicher Tag (8 bis 10)', (c) => c.j?.happy, (v) => isNum(v) && v >= 8, (v) => isNum(v) && v <= 5, ['hrv', 'rhr', 'sleepScore', 'latencySubj'], { aLabel: 'Glück 8–10', bLabel: 'Glück 0–5' }),
+
+  // Glück am selben Tag (Logbuch): Schlaf der Nacht davor, Bewegung, Arbeit, Alltag
+  F('sleepGoodH', 'Glück', 'Gut geschlafen (Schlaf-Score ab 70)', (c) => c.day?.sleepScore, (v) => isNum(v) && v >= 70, (v) => isNum(v) && v < 55, ['happy'], { lag: 0, aLabel: 'Score ab 70', bLabel: 'unter 55' }),
+  F('sleepShortH', 'Glück', 'Unter 6 Stunden geschlafen', (c) => c.day?.sleep?.asleepMin, (v) => isNum(v) && v < 360, (v) => isNum(v) && v >= 420, ['happy'], { lag: 0, aLabel: 'unter 6 h', bLabel: 'ab 7 h' }),
+  F('sportH', 'Glück', 'Sport am Tag (ab 30 Minuten)', (c) => sportMinutes(c), (v) => isNum(v) && v >= 30, (v) => v === 0, ['happy'], { lag: 0, aLabel: 'ab 30 min', bLabel: 'kein Sport' }),
+  F('workLongH', 'Glück', 'Langer Arbeitstag (ab 9 h)', (c) => c.j?.work, (v) => isNum(v) && v >= 9, (v) => isNum(v) && v > 0 && v <= 8, ['happy'], { lag: 0, aLabel: 'ab 9 h', bLabel: '1–8 h' }),
+  F('dayOffH', 'Glück', 'Arbeitsfreier Tag', (c) => c.j?.work, (v) => v === 0, (v) => isNum(v) && v > 0, ['happy'], { lag: 0, aLabel: 'frei', bLabel: 'Arbeitstag' }),
+  F('waterLowH', 'Glück', 'Wenig getrunken (unter 1,5 l)', (c) => c.j?.waterMl, (v) => isNum(v) && v < 1500, (v) => isNum(v) && v >= 1500, ['happy'], { lag: 0, aLabel: 'unter 1,5 l', bLabel: 'ab 1,5 l' }),
+  F('stressH', 'Glück', 'Hoher Stress (4–5)', (c) => c.a.A1, (v) => v >= 4, (v) => v <= 2, ['happy'], { lag: 0, aLabel: 'Stress 4–5', bLabel: 'Stress 1–2' }),
+  F('daylightH', 'Glück', 'Über 1 Stunde Tageslicht', (c) => c.a.A9, (v) => v === 'gt60', (v) => v === 'lt15', ['happy'], { lag: 0, aLabel: '> 60 min', bLabel: '< 15 min' }),
+  F('natureH', 'Glück', 'Zeit in der Natur', (c) => c.a.P6, (v) => v === true, (v) => v === false, ['happy'], { lag: 0 }),
+  F('socialH', 'Glück', 'Viel soziale Zeit', (c) => c.a.P7, (v) => v === 'viel', (v) => v === 'wenig', ['happy'], { lag: 0, aLabel: 'viel', bLabel: 'wenig' }),
+  F('screenH', 'Glück', 'Über 5 h Bildschirmzeit', (c) => c.a.P10, (v) => v === 'gt5', (v) => v === 'lt2', ['happy'], { lag: 0, aLabel: '> 5 h', bLabel: '< 2 h' }),
+  F('weekendH', 'Glück', 'Wochenende (Sa, So)', (c) => weekday(c.date), (v) => v === 0 || v === 6, (v) => v >= 1 && v <= 5, ['happy'], { lag: 0, aLabel: 'Sa/So', bLabel: 'Mo–Fr' }),
+  F('shortDayH', 'Glück', 'Kurze Tage (unter 9 h Tageslicht)', (c) => c.ctx?.daylightH, (v) => isNum(v) && v < 9, (v) => isNum(v) && v >= 12, ['happy'], { lag: 0, aLabel: 'unter 9 h', bLabel: 'ab 12 h' }),
+
   // Umwelt und Kalender (automatisch)
   F('warmNight', 'Umwelt', 'Warme Nacht (ab 18 °C)', (c) => c.ctx?.nightTempMin, (v) => isNum(v) && v >= 18, (v) => isNum(v) && v < 15, ['deep', 'efficiency', 'wake', 'sleepScore', 'hrv'], { aLabel: '≥ 18 °C', bLabel: '< 15 °C' }),
   F('hotDay', 'Umwelt', 'Heißer Tag (ab 28 °C)', (c) => c.ctx?.tMax, (v) => isNum(v) && v >= 28, (v) => isNum(v) && v < 22, ['sleepScore', 'hrv', 'rhr'], { aLabel: '≥ 28 °C', bLabel: '< 22 °C' }),
@@ -139,6 +162,14 @@ export const FACTORS = [
   F('weekendNight', 'Umwelt', 'Wochenend-Nacht (Fr, Sa)', (c) => weekday(c.date), (v) => v === 5 || v === 6, (v) => v >= 0 && v <= 4, ['hrv', 'rhr', 'sleepScore', 'asleep'], { aLabel: 'Fr/Sa', bLabel: 'So–Do' }),
   F('holidayEve', 'Umwelt', 'Vorabend eines Feiertags', (c) => isHoliday(addDays(c.date, 1)), (v) => v === true, (v) => v === false, ['hrv', 'sleepScore']),
 ];
+
+/** Trainingsminuten eines Tages (Apple Health und Logbuch); 0 nur, wenn der Tag erfasst ist. */
+function sportMinutes(c) {
+  const sessions = sportSessions(c.jr, c.day?.workouts || []);
+  if (sessions.length) return sessions.reduce((s, x) => s + (x.min || 0), 0);
+  const worn = isNum(c.day?.hrCoverageMin) && c.day.hrCoverageMin >= 600;
+  return worn || (c.jr && !isEmptyDay(c.jr)) ? 0 : undefined;
+}
 
 /** Ein Faktor je Supplement: Tage mit dem Mittel gegen Tage, an denen Supplements angegeben, dieses aber nicht genommen wurde. */
 function supplementFactor(sup) {
@@ -162,7 +193,9 @@ export const SUPPLEMENT_FACTORS = SUPPLEMENTS.map(supplementFactor);
 /** Alle Faktoren inklusive der eigenen Supplements aus den Einstellungen. */
 export function factorsFor(settings) {
   const custom = allSupplements(settings, { includeHidden: true }).filter((s) => s.group === 'eigene').map(supplementFactor);
-  return FACTORS.concat(SUPPLEMENT_FACTORS, custom);
+  const { red = 34, green = 67 } = settings?.model?.recovery || {};
+  const recovery = F('recoveryH', 'Glück', `Recovery grün (ab ${green})`, (c) => c.day?.recovery, (v) => isNum(v) && v >= green, (v) => isNum(v) && v < red, ['happy'], { lag: 0, aLabel: 'grün', bLabel: `unter ${red}` });
+  return FACTORS.concat([recovery], SUPPLEMENT_FACTORS, custom);
 }
 
 export function formatEffect(target, diff, { short = false } = {}) {
@@ -187,13 +220,16 @@ function confidence(q, n, qThreshold) {
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 /** Führt die Analyse aus. Gibt Ergebnisse, zu dünne Faktoren, Modell-Gefühl-Abgleich und Dosiskurven zurück. */
-export async function computeInsights({ dates, days, survey, settings, onProgress }) {
+export async function computeInsights({ dates, days, survey, journal = new Map(), settings, onProgress }) {
   const { minN, permutations, bootstrap, qThreshold } = settings.analysis;
   const ctxCache = new Map();
   const ctxOf = (date) => {
     if (!ctxCache.has(date)) {
       const day = days.get(date);
-      ctxCache.set(date, { date, a: effectiveAnswers(survey, date), day, ctx: day?.context || null });
+      const jr = journal.get(date) || null;
+      // Was im Logbuch steht (Wasser, Koffein, Training), ersetzt die grobe Antwort aus dem Abendcheck
+      const a = { ...effectiveAnswers(survey, date), ...journalAnswers(jr, day?.workouts).answers };
+      ctxCache.set(date, { date, a, day, ctx: day?.context || null, j: day?.journal || null, jr });
     }
     return ctxCache.get(date);
   };
@@ -340,13 +376,16 @@ function countData(dates, days) {
   let mornings = 0;
   let evenings = 0;
   let nights = 0;
+  let journal = 0;
   for (const d of dates) {
     const x = days.get(d);
     if (x?.survey?.ts?.morning) mornings++;
     if (x?.survey?.ts?.evening) evenings++;
     if (x?.sleep) nights++;
+    const j = x?.journal;
+    if (j && (j.waterMl != null || j.caffeineN != null || j.happy != null || j.work != null || j.sportN || j.text)) journal++;
   }
-  return { days: dates.length, mornings, evenings, nights };
+  return { days: dates.length, mornings, evenings, nights, journal };
 }
 
 /** Wie gut passen Recovery und Schlaf-Score zum Gefühl am Morgen? */

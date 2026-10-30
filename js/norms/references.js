@@ -1,5 +1,5 @@
 // Richt- und Normalwerte offizieller Stellen (und, wo es keine gibt, gekennzeichnete Studien)
-// für die Infopunkte im Dashboard. Stand der Prüfung: 27.10.2026.
+// für die Infopunkte im Dashboard. Stand der Prüfung: 28.10.2026.
 
 export const SOURCES = {
   aha: { label: 'American Heart Association (Go Red for Women): Target Heart Rates Chart', url: 'https://www.goredforwomen.org/en/healthy-living/fitness/fitness-basics/target-heart-rates' },
@@ -20,7 +20,26 @@ export const SOURCES = {
   whoAir: { label: 'WHO Global Air Quality Guidelines 2021', url: 'https://iris.who.int/handle/10665/345334' },
   dwdPollen: { label: 'Deutscher Wetterdienst: Pollenflug-Gefahrenindex', url: 'https://opendatao.dwd.de/climate_environment/health/alerts/Beschreibung_pollen_s31fg.pdf' },
   hlnug: { label: 'HLNUG: Kenntage der Wärmebelastung (Daten: Deutscher Wetterdienst)', url: 'https://www.hlnug.de/fileadmin/dokumente/nachhaltigkeit/Klimafolgenindikatoren/2020/Waermebelastung_Kenntage.pdf' },
+  dachWater: { label: 'D-A-CH-Referenzwerte (DGE, ÖGE, SGE) 2018 für Wasser, zusammengestellt vom VIS Bayern', url: 'https://www.vis.bayern.de/essen_trinken/ernaehrungsformen/doc/richtwerte_fuer_zufuhr_wasser_akt.pdf' },
+  efsaWater: { label: 'EFSA: Ernährungsreferenzwerte für Wasser (2010)', url: 'https://www.efsa.europa.eu/en/press/news/nda100326' },
+  efsaCaffeine: { label: 'EFSA erklärt die Risikobewertung: Koffein (2015)', url: 'https://www.efsa.europa.eu/sites/default/files/corporate_publications/files/efsaexplainscaffeine150527.pdf' },
+  bfrCaffeine: { label: 'Bundesinstitut für Risikobewertung (BfR): Fragen und Antworten zu Koffein', url: 'https://bfr.bund.de/cd/194902' },
+  onsHappy: { label: 'Britische Regierung, Daten des Statistikamts ONS: Well-being, happiness yesterday', url: 'https://www.ethnicity-facts-figures.service.gov.uk/health/wellbeing/well-being-happiness-yesterday/2.0' },
+  arbzg3: { label: 'Arbeitszeitgesetz § 3: Arbeitszeit der Arbeitnehmer', url: 'https://www.gesetze-im-internet.de/arbzg/__3.html' },
+  arbzg5: { label: 'Arbeitszeitgesetz § 5: Ruhezeit', url: 'https://www.gesetze-im-internet.de/arbzg/__5.html' },
+  whoIlo: { label: 'WHO und ILO: Lange Arbeitszeiten und Todesfälle durch Herzkrankheit und Schlaganfall (2021)', url: 'https://www.paho.org/en/news/17-5-2021-long-working-hours-increasing-deaths-heart-disease-and-stroke-who-ilo' },
 };
+
+/** D-A-CH: Wasser aus Getränken je Altersgruppe (ml am Tag). */
+function drinkReference(age) {
+  if (age == null || age < 19) return null;
+  if (age < 25) return [1470, '19 bis 24 Jahre'];
+  if (age < 51) return [1410, '25 bis 50 Jahre'];
+  if (age < 65) return [1230, '51 bis 64 Jahre'];
+  return [1310, '65 Jahre und älter'];
+}
+
+const happyBandOf = (v) => (v <= 4 ? 'niedrig' : v <= 6 ? 'mittel' : v <= 8 ? 'hoch' : 'sehr hoch');
 
 const fmt = (x, d = 0) => (x == null || !Number.isFinite(x) ? '–' : x.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d }));
 
@@ -60,7 +79,7 @@ const REFS = {
     what: 'Deine Bereitschaft für heute: Recovery und Schlaf der letzten drei Tage, dazu Belastungsbalance und Langzeit-Fitness.',
     official: [],
     personal: v == null ? null : v >= 67 ? 'Grün: gute Voraussetzungen für hartes Training.' : v >= 34 ? 'Gelb: moderates Training passt.' : 'Rot: Erholung hat heute Vorrang.',
-    app: 'Gewichte: Recovery 45 %, Schlaf 25 %, Belastungsbalance 15 %, Langzeit-Fitness 15 %. Grenzen: unter 34 rot, ab 67 grün (änderbar unter Daten → Modell).',
+    app: 'Gewichte: Recovery 45 %, Schlaf 25 %, Belastungsbalance 15 %, Langzeit-Fitness 15 %. Grenzen: unter 34 rot, ab 67 grün (änderbar unter Profil → Einstellungen → Modell und Gewichte).',
     caveat: 'Für Gesamtscores wie diesen gibt es keine offiziellen Normwerte. Er vergleicht dich mit dir selbst.',
   }),
   recovery: (v) => ({
@@ -184,7 +203,7 @@ const REFS = {
       what: 'Wie viel Schlaf du heute Nacht brauchst, berechnet aus deiner Basis, der Belastung des Vortags und der Schlafschuld.',
       official: [{ label: 'Empfehlung Erwachsene', value: '7–9 h (ab 65: 7–8 h)', src: 'nsfDuration' }],
       personal: r ? `Für dein Alter empfiehlt die NSF ${r[0]}–${r[1]} Stunden.` : null,
-      app: 'Basis (Daten → Profil), plus 0,01 h je Strain-Punkt über 40 am Vortag, plus ein Viertel der Schlafschuld der letzten drei Nächte (höchstens 1,5 h), minus Nickerchen.',
+      app: 'Basis (Profil → Körperdaten), plus 0,01 h je Strain-Punkt über 40 am Vortag, plus ein Viertel der Schlafschuld der letzten drei Nächte (höchstens 1,5 h), minus Nickerchen.',
     };
   },
   efficiency: (v) => ({
@@ -295,7 +314,7 @@ const REFS = {
     ],
     personal: v == null ? null : `${fmt(v)} von 100.`,
     app: 'Gleitender Mittelwert mit 42 Tagen Halbwertszeit. Anker: Ruhepuls 42 bpm = 100 und 78 bpm = 0; 300 Aktivminuten pro Woche = 100.',
-    caveat: 'Keine offizielle Norm; die Anker sind Startwerte und unter Daten → Modell änderbar.',
+    caveat: 'Keine offizielle Norm; die Anker sind Startwerte und unter Profil → Einstellungen → Modell und Gewichte änderbar.',
   }),
   vo2: (v) => ({
     title: 'VO₂max',
@@ -379,6 +398,84 @@ const REFS = {
     personal: v == null ? null : `Letzte Nacht: ${fmt(v)} %.`,
     app: 'In den Einsichten prüft die App schwüle Nächte (ab 85 %).',
     caveat: 'Für Außenluftfeuchte gibt es keine Gesundheits-Richtwerte.',
+  }),
+  water: (v, age, ctx) => {
+    const ref = drinkReference(age);
+    const l = (ml) => fmt(ml / 1000, ml % 100 === 0 ? 1 : 2);
+    return {
+      title: 'Trinken',
+      badge: 'offiziell',
+      what: 'Wasser und andere Getränke ohne Koffein, die du im Logbuch einträgst. Kaffee, schwarzer Tee und Cola stehen beim Koffein.',
+      official: [
+        { label: 'Aus Getränken, 19 bis 24 Jahre', value: '1,47 l am Tag', src: 'dachWater' },
+        { label: 'Aus Getränken, 25 bis 50 Jahre', value: '1,41 l am Tag', src: 'dachWater' },
+        { label: 'Aus Getränken, 51 bis 64 Jahre', value: '1,23 l am Tag', src: 'dachWater' },
+        { label: 'Aus Getränken, ab 65 Jahren', value: '1,31 l am Tag', src: 'dachWater' },
+        { label: 'Wasser insgesamt, mit Essen', value: 'Frauen 2,0 l, Männer 2,5 l am Tag', src: 'efsaWater' },
+      ],
+      personal: v == null ? (ref ? `Für dein Alter (${ref[1]}) nennen die D-A-CH-Werte ${l(ref[0])} l aus Getränken.` : null)
+        : `Heute: ${l(v)} l${ref ? `; für dein Alter ${l(ref[0])} l aus Getränken` : ''}.`,
+      app: 'Dein Trinkziel (Startwert 2 l) stellst du unten im Logbuch ein. Die Tagesmenge ersetzt im Abendcheck die Frage „Getrunken“ und fließt in die Einsichten ein.',
+      caveat: 'Bei Hitze, viel Sport oder Fieber braucht der Körper mehr. Wer wegen einer Herz- oder Nierenerkrankung weniger trinken soll, folgt dem ärztlichen Rat.',
+    };
+  },
+  caffeine: (v) => ({
+    title: 'Koffein',
+    badge: 'offiziell',
+    what: 'Koffein aus Kaffee, Tee, Cola, Energydrinks und Pre-Workout. Für Kaffee, Tee, Cola und Energydrinks nutzt die App die Richtwerte des BfR; jeden Eintrag kannst du anpassen.',
+    official: [
+      { label: 'Über den Tag verteilt', value: 'bis 400 mg unbedenklich für gesunde Erwachsene', src: 'efsaCaffeine' },
+      { label: 'Auf einmal', value: 'bis 200 mg (etwa 3 mg je kg Körpergewicht)', src: 'efsaCaffeine' },
+      { label: 'Kurz vor dem Schlafen', value: 'schon 100 mg können bei manchen Schlafdauer und Schlafablauf verändern', src: 'efsaCaffeine' },
+      { label: 'Schwangerschaft und Stillzeit', value: 'bis 200 mg am Tag', src: 'efsaCaffeine' },
+      { label: 'Filterkaffee 200 ml · Espresso 60 ml', value: '90 mg · 80 mg', src: 'bfrCaffeine' },
+      { label: 'Schwarztee · Grüntee, je 200 ml', value: '45 mg · 30 mg', src: 'bfrCaffeine' },
+      { label: 'Cola 330 ml · Energydrink 250 ml', value: '35 mg · 80 mg', src: 'bfrCaffeine' },
+    ],
+    personal: v == null ? null : v > 400 ? `Heute etwa ${fmt(v)} mg, mehr als die 400 mg, die die EFSA für einen Tag als unbedenklich einstuft.` : `Heute etwa ${fmt(v)} mg.`,
+    app: 'Anzahl und Uhrzeit des letzten Getränks ersetzen im Abendcheck die Koffein-Fragen. Die Einsichten prüfen, ob spätes oder viel Koffein deinen Schlaf verändert.',
+    caveat: 'Wie stark und wie lange Koffein wirkt, ist von Mensch zu Mensch verschieden. Die Werte gelten nicht bei Erkrankungen, mit Medikamenten oder bei viel Alkohol.',
+  }),
+  happy: (v) => ({
+    title: 'Glück',
+    badge: 'offiziell',
+    what: 'Wie glücklich du dich am Tag insgesamt gefühlt hast, von 0 (gar nicht) bis 10 (völlig). Die Frage folgt der Wohlbefindens-Erhebung des britischen Statistikamts ONS; dort wird nach dem Vortag gefragt.',
+    official: [
+      { label: 'Niedrig', value: '0 bis 4', src: 'onsHappy' },
+      { label: 'Mittel', value: '5 bis 6', src: 'onsHappy' },
+      { label: 'Hoch', value: '7 bis 8', src: 'onsHappy' },
+      { label: 'Sehr hoch', value: '9 bis 10', src: 'onsHappy' },
+      { label: 'Durchschnitt im Vereinigten Königreich 2017', value: '7,5', src: 'onsHappy' },
+    ],
+    personal: v == null ? null : `Heute: ${v}, das gilt als ${happyBandOf(v)}.`,
+    app: 'In den Einsichten ist Glück ein eigener Zielwert: Die App prüft, was an guten Tagen anders war, etwa Schlaf, Sport oder Arbeitszeit.',
+    caveat: 'Eine Einordnung, keine Diagnose. Fühlst du dich über Wochen niedergeschlagen, sprich mit jemandem, dem du vertraust, oder hol dir ärztliche Unterstützung.',
+  }),
+  sportWeek: (v) => ({
+    title: 'Sport pro Woche',
+    badge: 'offiziell',
+    what: 'Trainingsminuten der Kalenderwoche aus Apple Health und dem Logbuch. Intensive Minuten (Anstrengung ab 7, HIIT oder Durchschnittspuls ab 70 % des Maximalpulses) zählen doppelt.',
+    official: [
+      { label: 'Erwachsene pro Woche', value: '150–300 min moderat oder 75–150 min intensiv', src: 'whoActivity' },
+      { label: 'Muskelkräftigung', value: 'an 2 oder mehr Tagen pro Woche', src: 'whoActivity' },
+      { label: 'Moderat / intensiv', value: '50–70 % / 70–85 % des Maximalpulses', src: 'aha' },
+    ],
+    personal: v == null ? null : `Diese Woche: ${fmt(v)} Minuten nach WHO-Rechnung.`,
+    app: 'Trainingseinheiten aus dem Logbuch ersetzen im Abendcheck die Trainingsfragen. Ein Eintrag, der zeitlich zu einem gemessenen Workout passt, zählt nur einmal.',
+    caveat: 'Bewegung ohne Trainingseinheit (Wege, Treppen) zählt hier nicht mit; die Aktivminuten unter „Heute“ erfassen sie über den Puls.',
+  }),
+  work: (v) => ({
+    title: 'Arbeitszeit',
+    badge: 'offiziell',
+    what: 'Wie viele Stunden du gearbeitet hast, ohne Pausen.',
+    official: [
+      { label: 'Arbeitszeitgesetz § 3', value: 'höchstens 8 h je Werktag; bis 10 h, wenn im Schnitt von 6 Monaten oder 24 Wochen 8 h nicht überschritten werden', src: 'arbzg3' },
+      { label: 'Arbeitszeitgesetz § 5', value: 'mindestens 11 h ununterbrochene Ruhezeit nach Arbeitsende', src: 'arbzg5' },
+      { label: 'WHO und ILO (2021)', value: 'ab 55 h pro Woche gegenüber 35–40 h: 35 % höheres Schlaganfallrisiko, 17 % höheres Risiko, an einer Herzkrankheit zu sterben', src: 'whoIlo' },
+    ],
+    personal: v == null ? null : v > 10 ? `Heute: ${fmt(v, v % 1 ? 1 : 0)} h, mehr als die 10 h, die das Arbeitszeitgesetz an einem Werktag höchstens erlaubt.` : `Heute: ${fmt(v, v % 1 ? 1 : 0)} h.`,
+    app: 'Die Einsichten prüfen, ob lange Arbeitstage (ab 9 h) deine HRV, deinen Schlaf oder dein Glück verändern.',
+    caveat: 'Das Arbeitszeitgesetz gilt für Angestellte; für Selbstständige und einige Berufe gelten Ausnahmen.',
   }),
   daylight: (v) => ({
     title: 'Tageslänge',

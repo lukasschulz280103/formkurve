@@ -56,6 +56,8 @@ function add(p) {
   }
 }
 for (const p of include) add(p);
+// Die eigene Firebase-Datei gehört nie ins Update-ZIP, sonst würde ein Update sie überschreiben
+for (const f of Object.keys(files)) if (/^sync-config\.js$/.test(f)) delete files[f];
 for (const must of ['index.html', 'sw.js', 'manifest.webmanifest', 'js/main.js', 'css/app.css']) {
   if (!files[must]) throw new Error(`${must} fehlt in der obersten Ebene des ZIP`);
 }

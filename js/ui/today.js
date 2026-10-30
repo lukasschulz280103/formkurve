@@ -1,7 +1,9 @@
 // Ansicht "Heute": Tagesform, Recovery, Schlaf, Strain, Gründe, Vitalwerte, Umwelt, Hinweise.
-import { html } from '../vendor/preact-htm.js';
-import { state, update, shiftDate, navigate, openCheck, tryDemo, leaveDemo, patchSettings, useCurrentLocation, toast } from './state.js';
-import { Dial, Ring, StatusChip, Contributions, RangeBar, zoneOf, zoneClass } from './components.js';
+import { html, useState } from '../vendor/preact-htm.js';
+import { state, update, shiftDate, navigate, openCheck, tryDemo, leaveDemo, patchSettings, useCurrentLocation, toast, importShortcutText, setHomeView, firstDataDay } from './state.js';
+import { Dial, Ring, StatusChip, Contributions, RangeBar, Segmented, zoneOf, zoneClass } from './components.js';
+import { PeriodChart } from './charts.js';
+import { periodAverages, periodSummary } from '../model/periods.js';
 import { InfoButton } from './info.js';
 import { Icon } from './icons.js';
 import { num, hours, clock, dayLabel, dateFull, signed, ago } from './format.js';
@@ -10,16 +12,38 @@ import { summarize } from '../model/hints.js';
 import { slotDone } from '../survey/engine.js';
 import { WORKOUT_LABEL } from '../data/normalize.js';
 import { formatPlace } from '../context/location.js';
+import { JournalToday } from './journalView.js';
 
-export function Topbar({ title, sub, nav = false }) {
-  const first = state.results.dates[0];
+/** Kopfzeile; prev und next sind { label, disabled, onClick }, above steht über dem Titel. */
+export function Topbar({ title, sub, above = null, prev = null, next = null }) {
   return html`<header class="topbar">
-    ${nav ? html`<button class="iconbtn" aria-label="Vortag" disabled=${!first || state.date <= first} onClick=${() => shiftDate(-1)}><${Icon} name="left" /></button>` : null}
-    <div class="grow" style=${nav ? 'text-align:center' : ''}>
+    ${prev ? html`<button class="iconbtn" aria-label=${prev.label} disabled=${prev.disabled} onClick=${prev.onClick}><${Icon} name="left" /></button>` : null}
+    <div class="grow" style=${prev || next ? 'text-align:center' : ''}>
+      ${above}
       <h1>${title}</h1>
       ${sub ? html`<div class="sub">${sub}</div>` : null}
     </div>
-    ${nav ? html`<button class="iconbtn" aria-label="Folgetag" disabled=${state.date >= state.today} onClick=${() => shiftDate(1)}><${Icon} name="right" /></button>` : null}
+    ${next ? html`<button class="iconbtn" aria-label=${next.label} disabled=${next.disabled} onClick=${next.onClick}><${Icon} name="right" /></button>` : null}
+  </header>`;
+}
+
+/** Umschalter über dem Titel: Tagesansicht oder Monatskalender. */
+export function HomeSwitch() {
+  const month = state.homeView === 'month';
+  return html`<div class="homeswitch" role="group" aria-label="Ansicht">
+    <button type="button" aria-pressed=${month ? 'false' : 'true'} onClick=${() => setHomeView('day')}><${Icon} name="sun" size=${14} />Tag</button>
+    <button type="button" aria-pressed=${month ? 'true' : 'false'} onClick=${() => setHomeView('month')}><${Icon} name="calendar" size=${14} />Monat</button>
+  </div>`;
+}
+
+/** Kopfzeile einer Unterseite im Reiter „Profil“ mit Zurück-Knopf. */
+export function SubTopbar({ title, sub }) {
+  return html`<header class="topbar">
+    <button type="button" class="iconbtn" aria-label="Zurück zum Profil" onClick=${() => navigate('profil')}><${Icon} name="left" /></button>
+    <div class="grow">
+      <h1>${title}</h1>
+      ${sub ? html`<div class="sub">${sub}</div>` : null}
+    </div>
   </header>`;
 }
 
@@ -28,6 +52,38 @@ export function DemoBanner() {
   return html`<div class="banner demo"><${Icon} name="info" size=${18} />
     <div class="grow"><b>Beispieldaten.</b> Alle Werte sind erfunden und zeigen, wie die App mit 90 Tagen Daten aussieht.
       ${state.preview ? null : html` <button class="linkbtn" onClick=${leaveDemo}>Konto anlegen oder anmelden</button>`}</div>
+  </div>`;
+}
+
+/** Täglicher Import direkt von „Heute“: Text aus dem Kurzbefehl einfügen, ohne in die Daten-Seite zu wechseln. */
+function ImportHint({ lastSample, reason }) {
+  const paste = async () => {
+    let text;
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {
+      text = null;
+    }
+    if (!text) {
+      toast('Die Zwischenablage ließ sich nicht lesen. Füge den Text hier ein.', 'error');
+      navigate('profil', 'daten');
+      return;
+    }
+    try {
+      const s = await importShortcutText(text);
+      toast(s.added ? `${num(s.added)} neue Werte importiert` : 'Keine neuen Werte, alles war schon da');
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  };
+  return html`<div class="banner">
+    <${Icon} name="sync" size=${18} />
+    <div class="grow stack-s"><span>${reason === 'again'
+      ? html`<b>Die letzte Nacht fehlt noch.</b> Synchronisiere den Strap in der Zepp-App, führe den Kurzbefehl „Formkurve Sync“ noch einmal aus und füge die Daten hier ein.`
+      : html`<b>${reason === 'night' ? 'Die letzte Nacht fehlt noch.' : `Letzte Messung ${ago(lastSample)}.`}</b> Führe den Kurzbefehl „Formkurve Sync“ aus und füge die Daten hier ein.`}</span>
+      <div class="row wrap" style="gap:8px"><button type="button" class="btn small primary" onClick=${paste}><${Icon} name="clipboard" size=${16} />Einfügen und importieren</button>
+        <button type="button" class="linkbtn" onClick=${() => navigate('profil', 'daten')}>Andere Wege</button></div>
+    </div>
   </div>`;
 }
 
@@ -63,7 +119,7 @@ function Empty() {
     <h2>Noch keine Daten</h2>
     <p class="ink2" style="max-width:34ch">Lade einmal deinen Apple-Health-Export für die Historie und richte den Kurzbefehl für den täglichen Import ein.</p>
     <div class="row wrap" style="justify-content:center">
-      <button class="btn primary" onClick=${() => navigate('daten')}><${Icon} name="import" size=${18} />Daten importieren</button>
+      <button class="btn primary" onClick=${() => navigate('profil', 'daten')}><${Icon} name="import" size=${18} />Daten importieren</button>
       <button class="btn" onClick=${tryDemo}>Beispieldaten ansehen</button>
     </div>
   </section>`;
@@ -86,34 +142,68 @@ function ProfileHint() {
     <div class="row between" style="align-items:flex-start"><h3>Genauere Normalwerte</h3><${Icon} name="info" size=${18} /></div>
     <p class="small ink2">Mit Geburtsjahr und Geschlecht ordnet die App Schlafdauer, Schritte und Maximalpuls passend zu deinem Alter ein. Freiwillig.</p>
     <div class="row wrap">
-      <button class="btn small primary" onClick=${() => {
-        navigate('daten');
-        setTimeout(() => document.getElementById('profil')?.scrollIntoView({ block: 'start' }), 80);
-      }}>Profil ergänzen</button>
+      <button class="btn small primary" onClick=${() => navigate('profil', 'koerper')}>Körperdaten ergänzen</button>
       <button class="btn small ghost" onClick=${() => patchSettings('display.profileHintDismissed', true)}>Nicht jetzt</button>
     </div>
   </section>`;
 }
 
+/** Tagesform je Woche oder Monat im Durchschnitt. */
+function FormPeriods() {
+  const s = state.repo.settings;
+  const unit = s.display.formPeriod === 'month' ? 'month' : 'week';
+  const [table, setTable] = useState(false);
+  const periods = periodAverages(state.results.dates, state.results.days, { unit, count: 12, today: state.today });
+  const sum = periodSummary(periods);
+  if (!sum) return null;
+  const { red, green } = s.model.recovery;
+  const word = unit === 'week' ? 'Woche' : 'Monat';
+  const head = sum.current.partial ? `${unit === 'week' ? 'Diese Woche' : 'Dieser Monat'} (${sum.current.label})` : sum.current.label;
+  return html`<section class="card" aria-labelledby="h-periods">
+    <div class="card-head">
+      <h2 id="h-periods" class="row" style="gap:4px">Tagesform im Schnitt<${InfoButton} k="form" value=${sum.current.mean} label="Tagesform" /></h2>
+      <button class="btn small ghost" aria-pressed=${table ? 'true' : 'false'} onClick=${() => setTable(!table)}><${Icon} name="table" size=${16} />${table ? 'Diagramm' : 'Tabelle'}</button>
+    </div>
+    <${Segmented} label="Zusammenfassen nach" value=${unit} onChange=${(v) => patchSettings('display.formPeriod', v)} options=${[{ value: 'week', label: 'Wochen' }, { value: 'month', label: 'Monate' }]} />
+    <div class="period-stat">
+      <div><div class="tiny muted">${head}</div><div class="big">${num(sum.current.mean)}</div></div>
+      ${sum.delta != null ? html`<span class="delta">${signed(sum.delta)} ${unit === 'week' ? 'zur Vorwoche' : 'zum Vormonat'}</span>` : null}
+      <span class="tiny muted">${sum.current.n} ${sum.current.n === 1 ? 'Tag' : 'Tage'} mit Wert</span>
+    </div>
+    ${table ? html`<div class="tablewrap"><table class="data">
+        <thead><tr><th>${word}</th><th>Zeitraum</th><th>Ø</th><th>Tage</th><th>Spanne</th></tr></thead>
+        <tbody>${periods.slice().reverse().map((p) => html`<tr><td>${p.label}${p.partial ? ' (läuft)' : ''}</td><td>${p.range}</td><td>${p.mean == null ? '–' : num(p.mean)}</td><td>${p.n}</td><td>${p.n > 1 ? `${num(p.min)}–${num(p.max)}` : '–'}</td></tr>`)}</tbody>
+      </table></div>`
+      : html`<${PeriodChart} periods=${periods} yDomain=${[0, 100]} yTicks=${[0, red, green, 100]} refLines=${[]} unitWord=${word} label=${`Durchschnittliche Tagesform je ${word}`} />`}
+    <p class="tiny muted" style="margin-top:6px">Linien bei ${red} und ${green}: ab ${green} „Bereit“, unter ${red} „Erholung zuerst“. Die helle Säule läuft noch.</p>
+  </section>`;
+}
+
+function SyncBanner() {
+  const st = state.sync;
+  if (!st?.linked || (st.state !== 'reauth' && st.state !== 'error')) return null;
+  return html`<button class="banner sync" style="text-align:left;cursor:pointer" onClick=${() => navigate('profil', 'konto')}>
+    <${Icon} name="cloud" size=${18} /><div class="grow"><b>${st.state === 'reauth' ? 'Abgleich pausiert.' : 'Abgleich gestört.'}</b> ${st.state === 'reauth' ? 'Bitte unter Profil → Konto neu anmelden; deine Eingaben bleiben auf diesem Gerät gespeichert.' : st.error || 'Details unter Profil → Konto.'}</div></button>`;
+}
+
 function BackupHint() {
   const repo = state.repo;
-  if (state.demo || state.preview || repo.survey.size < 7) return null;
+  if (state.demo || state.preview || Math.max(repo.survey.size, repo.journal.size) < 7) return null;
+  // Mit Online-Konto liegt eine verschlüsselte Kopie in der Cloud
+  if (state.sync?.linked && state.sync.lastSync && Date.now() - state.sync.lastSync < 7 * 86400000) return null;
   const now = Date.now();
   const meta = repo.meta;
   if ((meta.backupSnoozeUntil || 0) > now) return null;
-  const firstAnswer = [...repo.survey.keys()].sort()[0];
+  const firstAnswer = [...repo.survey.keys(), ...repo.journal.keys()].sort()[0];
   const daysSinceFirst = firstAnswer ? Math.round((now - new Date(`${firstAnswer}T12:00:00`).getTime()) / 86400000) : 0;
   const daysSinceBackup = meta.lastBackup ? Math.floor((now - meta.lastBackup) / 86400000) : null;
   const due = daysSinceBackup == null ? daysSinceFirst >= 14 : daysSinceBackup >= 30;
   if (!due) return null;
   return html`<section class="card stack">
     <div class="row between" style="align-items:flex-start"><h3>${daysSinceBackup == null ? 'Noch kein Backup' : `Letztes Backup vor ${daysSinceBackup} Tagen`}</h3><${Icon} name="import" size=${18} /></div>
-    <p class="small ink2">Deine Check-in-Antworten liegen nur auf diesem Gerät. Messwerte kommen jederzeit wieder aus Apple Health, die Antworten nur aus einem Backup.</p>
+    <p class="small ink2">Deine Check-in-Antworten und dein Logbuch liegen nur auf diesem Gerät. Messwerte kommen jederzeit wieder aus Apple Health, Antworten und Logbuch nur aus einem Backup.</p>
     <div class="row wrap">
-      <button class="btn small primary" onClick=${() => {
-        navigate('daten');
-        setTimeout(() => document.getElementById('backup')?.scrollIntoView({ block: 'start' }), 80);
-      }}>Backup sichern</button>
+      <button class="btn small primary" onClick=${() => navigate('profil', 'backup')}>Backup sichern</button>
       <button class="btn small ghost" onClick=${async () => {
         await repo.patchMeta({ backupSnoozeUntil: now + 7 * 86400000 });
         update({ version: state.version + 1 });
@@ -167,9 +257,18 @@ export function TodayView() {
   const isToday = date === state.today;
   const hasAny = state.results.dates.length > 0 && state.repo.buckets.size > 0;
   const lastSample = state.repo.index.lastSample;
+  const firstDay = firstDataDay();
   const now = new Date();
   const gate = isToday && settings.display.hideScoresUntilMorning && !slotDone(state.repo.survey, date, 'morning') && !state.showScoresAnyway && now.getHours() < settings.survey.morningUntilHour && d && (d.recovery != null || d.sleep);
   const showEvening = isToday && now.getHours() >= 17 && !slotDone(state.repo.survey, date, 'evening');
+  // Einfügen direkt hier, damit der tägliche Import ein Tipp bleibt: wenn die Daten alt sind oder die Nacht noch fehlt.
+  // Kam die Nacht auch mit dem Import des Morgens nicht, bleibt der Hinweis bis 14 Uhr (vielleicht hatte Zepp noch nicht synchronisiert).
+  const li = state.lastImport;
+  const importedToday = Boolean(li?.parsed) && (li.at || 0) >= new Date(now).setHours(5, 0, 0, 0);
+  const nightMissing = isToday && now.getHours() >= 5 && !d?.sleep && d?.hrv == null && (!importedToday || now.getHours() < 14);
+  const importReason = !hasAny || !isToday || state.demo || !lastSample ? null
+    : nightMissing ? (importedToday ? 'again' : 'night')
+    : Date.now() - lastSample > 20 * 3600000 ? 'stale' : null;
   const zone = zoneOf(d?.form, settings);
   const formDelta = d?.form != null && prev?.form != null ? d.form - prev.form : null;
   const rz = zoneOf(d?.recovery, settings);
@@ -211,13 +310,16 @@ export function TodayView() {
   }
 
   return html`
-    <${Topbar} nav=${true} title=${dayLabel(date, state.today)} sub=${dateFull(date)} />
+    <${Topbar} above=${html`<${HomeSwitch} />`} title=${dayLabel(date, state.today)} sub=${dateFull(date)}
+      prev=${{ label: 'Vortag', disabled: !firstDay || date <= firstDay, onClick: () => shiftDate(-1) }}
+      next=${{ label: 'Folgetag', disabled: date >= state.today, onClick: () => shiftDate(1) }} />
     <main class="view" id="main">
       <${DemoBanner} />
+      <${SyncBanner} />
       ${!hasAny && !state.demo ? html`<${Empty} />` : null}
-      ${hasAny && isToday && !state.demo && lastSample && Date.now() - lastSample > 20 * 3600000 ? html`<button class="banner" style="text-align:left;cursor:pointer" onClick=${() => navigate('daten')}>
-          <${Icon} name="sync" size=${18} /><div class="grow"><b>Letzte Messung ${ago(lastSample)}.</b> Führe den Kurzbefehl „Formkurve Sync“ aus und füge die Daten hier ein.</div></button>` : null}
+      ${importReason ? html`<${ImportHint} lastSample=${lastSample} reason=${importReason} />` : null}
       ${gate ? html`<${MorningGate} />` : null}
+      ${(gate || !hasAny) && isToday ? html`<${JournalToday} />` : null}
       ${hasAny && !gate && d ? html`
         <section class="hero" aria-label="Tagesform">
           <${Dial} value=${d.form} marks=${[settings.model.recovery.red, settings.model.recovery.green]} muted=${!d.calibrated} />
@@ -249,6 +351,8 @@ export function TodayView() {
             <div class="ring-sub">${strainSub}</div>
           </div>
         </section>
+        ${isToday ? html`<${JournalToday} />` : null}
+        <${FormPeriods} />
         <${ProfileHint} />
         <${BackupHint} />
         ${contrib.length ? html`<section class="card">

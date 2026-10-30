@@ -1,43 +1,50 @@
-// Wurzelkomponente: Ansichten, Tab-Leiste, Meldungen.
+// Wurzelkomponente: Ansichten, Tab-Leiste, schwebender Check-in, Meldungen.
 import { html } from '../vendor/preact-htm.js';
-import { useAppState, navigate } from './state.js';
+import { state, useAppState, navigate, update } from './state.js';
 import { Icon } from './icons.js';
 import { Progress } from './components.js';
 import { TodayView } from './today.js';
+import { MonthView } from './calendarView.js';
 import { TrendsView } from './trends.js';
-import { CheckView } from './checkin.js';
-import { InsightsView } from './insightsView.js';
-import { DataView } from './dataView.js';
-import { slotDone } from '../survey/engine.js';
+import { CheckSheet, CheckFab } from './checkin.js';
+import { ProfileView } from './profileView.js';
+import { JournalView } from './journalView.js';
 import { mb } from './format.js';
 import { AuthView, OnboardingView } from './auth.js';
 import { InfoSheet } from './info.js';
 
 const TABS = [
   { route: 'heute', label: 'Heute', icon: 'sun' },
+  { route: 'logbuch', label: 'Logbuch', icon: 'book' },
   { route: 'verlauf', label: 'Verlauf', icon: 'trends' },
-  { route: 'check', label: 'Check-in', icon: 'check' },
-  { route: 'einsichten', label: 'Einsichten', icon: 'insights' },
-  { route: 'daten', label: 'Daten', icon: 'data' },
+  { route: 'profil', label: 'Profil', icon: 'user' },
 ];
 
-const VIEWS = { heute: TodayView, verlauf: TrendsView, check: CheckView, einsichten: InsightsView, daten: DataView };
+/** „Heute“ zeigt entweder den Tag oder den Monatskalender. */
+function HomeView() {
+  return state.homeView === 'month' ? html`<${MonthView} />` : html`<${TodayView} />`;
+}
+
+const VIEWS = { heute: HomeView, logbuch: JournalView, verlauf: TrendsView, profil: ProfileView };
 
 function TabBar({ s }) {
-  const h = new Date().getHours();
-  const survey = s.repo?.survey;
-  const due = survey && ((h < s.repo.settings.survey.morningUntilHour && !slotDone(survey, s.today, 'morning')) || (h >= 18 && !slotDone(survey, s.today, 'evening')));
   return html`<nav class="tabbar" aria-label="Hauptnavigation"><div class="tabbar-inner">
     ${TABS.map((t) => html`<button type="button" class="tab" aria-current=${s.route === t.route ? 'page' : null} onClick=${() => navigate(t.route)}>
       <${Icon} name=${t.icon} size=${24} />${t.label}
-      ${t.route === 'check' && due ? html`<i class="badge" aria-label="Check offen"></i>` : null}
     </button>`)}
   </div></nav>`;
 }
 
 function Overlays({ s }) {
   return html`
-    ${s.toast ? html`<div class=${`toast ${s.toast.kind === 'error' ? 'error' : ''}`} role="status">${s.toast.text}</div>` : null}
+    ${s.toast ? html`<div class=${`toast ${s.toast.kind === 'error' ? 'error' : ''}${s.toast.action ? ' with-action' : ''}`} role="status">
+      <span>${s.toast.text}</span>
+      ${s.toast.action ? html`<button type="button" class="toast-btn" onClick=${() => {
+        const { run } = s.toast.action;
+        update({ toast: null });
+        run();
+      }}>${s.toast.action.label}</button>` : null}
+    </div>` : null}
     ${s.busy ? html`<div class="overlay" role="alertdialog" aria-live="polite" aria-label=${s.busy}><div class="card">
       <div class="spinner"></div><p>${s.busy}</p>
       ${s.progress ? html`<${Progress} ratio=${s.progress.ratio} /><p class="small muted tnum">${mb(s.progress.ratio * s.progress.total)} von ${mb(s.progress.total)}</p>` : null}
@@ -51,8 +58,12 @@ export function App() {
   if (s.onboarding) return html`<div class="app"><${OnboardingView} /><${Overlays} s=${s} /></div>`;
   const View = VIEWS[s.route] || TodayView;
   return html`<div class="app">
-    <${View} key=${s.route} />
-    <${TabBar} s=${s} />
+    <div inert=${s.checkOpen} aria-hidden=${s.checkOpen ? 'true' : null}>
+      <${View} key=${`${s.route}/${s.sub || ''}`} />
+      <${TabBar} s=${s} />
+      <${CheckFab} />
+    </div>
+    ${s.checkOpen ? html`<${CheckSheet} />` : null}
     <${InfoSheet} />
     <${Overlays} s=${s} />
   </div>`;

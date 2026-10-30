@@ -1,7 +1,7 @@
 // Ansicht "Einsichten": welche Gewohnheiten und Umweltfaktoren deine Werte bewegen.
 import { html, useState, useEffect } from '../vendor/preact-htm.js';
-import { state, runInsights, navigate } from './state.js';
-import { Topbar, DemoBanner } from './today.js';
+import { state, runInsights, openCheck } from './state.js';
+import { SubTopbar, DemoBanner } from './today.js';
 import { Confidence, Progress } from './components.js';
 import { Icon } from './icons.js';
 import { num, ago } from './format.js';
@@ -15,6 +15,7 @@ const FILTERS = [
   { key: 'sleep', label: 'Schlaf', targets: ['sleepScore', 'deep', 'rem', 'efficiency', 'asleep', 'wake'] },
   { key: 'latency', label: 'Einschlafen', targets: ['latency', 'latencySubj'] },
   { key: 'feel', label: 'Gefühl', targets: ['feel'] },
+  { key: 'happy', label: 'Glück', targets: ['happy'] },
 ];
 
 function EffectBar({ r, width = 96 }) {
@@ -33,7 +34,12 @@ function EffectBar({ r, width = 96 }) {
   </svg>`;
 }
 
-function lagText(lag) {
+/** Wann die Wirkung gemessen wird: Nacht-Werte (Schlaf, HRV) oder Tageswerte (Glück aus dem Logbuch). */
+function lagText(lag, targets = []) {
+  const day = targets.filter((t) => TARGETS[t]?.day).length;
+  const night = targets.length - day;
+  if (day && night) return lag === 0 ? 'in derselben Nacht und am selben Tag' : 'in der Nacht und am Tag danach';
+  if (day) return lag === 0 ? 'am selben Tag' : 'am Tag danach';
   return lag === 0 ? 'in derselben Nacht' : 'in der Nacht danach';
 }
 
@@ -57,15 +63,15 @@ function FactorCard({ rows }) {
       <div class="grow">
         <div class="eyebrow">${top.group}</div>
         <h3>${top.label}</h3>
-        <div class="meta">${top.nA} Tage ${top.aLabel} · ${top.nB} Tage ${top.bLabel} · Wirkung ${lagText(top.lag)}</div>
+        <div class="meta">${top.nA} Tage ${top.aLabel} · ${top.nB} Tage ${top.bLabel} · Wirkung ${lagText(top.lag, rows.map((r) => r.target))}</div>
       </div>
       <span class="row tiny muted" style="gap:6px;white-space:nowrap"><${Confidence} level=${best.confidence} />${best.confidence}</span>
     </div>
     <div class="list">
       ${rows.map((r) => html`<div class="row" style="padding:8px 0;border-top:1px solid var(--line);gap:8px">
-        <span class="grow small ink2">${TARGETS[r.target].label}</span>
+        <span class="grow small ink2 ins-label">${TARGETS[r.target].label}</span>
         <${EffectBar} r=${r} />
-        <span class="num" style="width:88px;flex:none;text-align:right;font-weight:650;font-size:15px;white-space:nowrap">${formatEffect(r.target, r.diff, { short: true })}</span>
+        <span class="num ins-num">${formatEffect(r.target, r.diff, { short: true })}</span>
       </div>`)}
     </div>
     <button class="linkbtn" style="justify-self:start" aria-expanded=${open ? 'true' : 'false'} onClick=${() => setOpen(!open)}>${open ? 'Weniger' : 'Details'}</button>
@@ -107,7 +113,7 @@ function FeelCard({ feel }) {
   return html`<section class="card stack">
     <div class="card-head" style="margin-bottom:0"><h2>Passt der Score zu deinem Gefühl?</h2></div>
     <p class="ink2">Recovery und dein Gefühl am Morgen hängen <b>${level}</b> zusammen (r = ${num(r, 2)}, ${feel.recovery.n} Tage).
-      ${r < 0.3 ? ' Nach einigen Wochen lohnt es sich, die Gewichte unter Daten → Modell anzupassen.' : ''}</p>
+      ${r < 0.3 ? ' Nach einigen Wochen lohnt es sich, die Gewichte unter Profil → Einstellungen anzupassen.' : ''}</p>
     <dl class="kv">
       ${feel.parts.hrv.r != null ? html`<dt>HRV und Gefühl</dt><dd>r = ${num(feel.parts.hrv.r, 2)}</dd>` : null}
       ${feel.parts.rhr.r != null ? html`<dt>niedriger Ruhepuls und Gefühl</dt><dd>r = ${num(feel.parts.rhr.r, 2)}</dd>` : null}
@@ -133,13 +139,13 @@ export function InsightsView() {
   const stale = state.insightsVersion !== state.version;
 
   return html`
-    <${Topbar} title="Einsichten" sub=${ins ? `Stand ${ago(ins.computedAt)}` : 'Analyse'} />
+    <${SubTopbar} title="Einsichten" sub=${ins ? `Stand ${ago(ins.computedAt)}` : 'Analyse'} />
     <main class="view">
       <${DemoBanner} />
       ${state.insightsBusy && !ins ? html`<section class="card stack"><p>Analysiere deine Daten …</p><${Progress} ratio=${state.insightsProgress} /></section>` : null}
       ${ins ? html`
         <section class="card stack">
-          <p class="ink2"><b class="num" style="color:var(--ink)">${groupByFactor(ins.results.filter((r) => r.confidence !== 'gering')).length}</b> Faktoren mit belastbarem Zusammenhang (${ins.results.filter((r) => r.confidence !== 'gering').length} von ${ins.totalTests} geprüften Paaren). Grundlage: ${ins.counts.nights} Nächte, ${ins.counts.evenings} Abend- und ${ins.counts.mornings} Morgenchecks.</p>
+          <p class="ink2"><b class="num" style="color:var(--ink)">${groupByFactor(ins.results.filter((r) => r.confidence !== 'gering')).length}</b> Faktoren mit belastbarem Zusammenhang (${ins.results.filter((r) => r.confidence !== 'gering').length} von ${ins.totalTests} geprüften Paaren). Grundlage: ${ins.counts.nights} Nächte, ${ins.counts.evenings} Abend- und ${ins.counts.mornings} Morgenchecks${ins.counts.journal ? `, ${ins.counts.journal} Logbuch-Tage` : ''}.</p>
           ${state.insightsBusy ? html`<${Progress} ratio=${state.insightsProgress} />` : stale ? html`<button class="btn small" onClick=${() => runInsights(true)}><${Icon} name="sync" size=${16} />Neu berechnen</button>` : null}
         </section>
         <div class="filterrow" role="group" aria-label="Zielwert">
@@ -151,7 +157,7 @@ export function InsightsView() {
         ${weak.length ? html`<details class="card more">
           <summary>Noch unsicher (${weak.length}) <${Icon} name="down" size=${18} /></summary>
           <p class="small muted" style="margin:8px 0">Diese Unterschiede können Zufall sein. Sie werden mit mehr Daten klarer oder verschwinden.</p>
-          <div class="list">${weak.map((r) => html`<div class="list-row"><span class="t">${r.label}</span><span class="num">${r.effectText}</span><span class="d">${TARGETS[r.target].label} ${lagText(r.lag)} · ${r.nA} zu ${r.nB} Tage</span></div>`)}</div>
+          <div class="list">${weak.map((r) => html`<div class="list-row"><span class="t">${r.label}</span><span class="num">${r.effectText}</span><span class="d">${TARGETS[r.target].label} ${lagText(r.lag, [r.target])} · ${r.nA} zu ${r.nB} Tage</span></div>`)}</div>
         </details>` : null}
         ${ins.insufficient.length ? html`<details class="card more">
           <summary>Zu wenig Daten (${ins.insufficient.length}) <${Icon} name="down" size=${18} /></summary>
@@ -162,11 +168,12 @@ export function InsightsView() {
           <summary>So wird gerechnet <${Icon} name="down" size=${18} /></summary>
           <div class="stack small ink2" style="margin-top:8px">
             <p>Für jeden Faktor vergleicht die App Tage mit und ohne ihn, und zwar mit der Nacht danach (Abendfragen) oder derselben Nacht (Gesundheit). HRV und Ruhepuls zählen als Abweichung von deinem Normalwert.</p>
+            <p>Das Glück aus dem Logbuch vergleicht sie mit demselben Tag (zum Beispiel Schlaf der Nacht davor, Sport, Arbeitsstunden) oder mit dem Tag danach (Alkohol). Was im Logbuch steht, ersetzt die groben Antworten des Abendchecks zu Wasser, Koffein und Training.</p>
             <p>Ein Permutationstest prüft, wie leicht der Unterschied durch Zufall entstehen kann; die Benjamini-Hochberg-Korrektur berücksichtigt, dass viele Faktoren gleichzeitig geprüft werden. Der bereinigte Wert kommt aus einer Ridge-Regression über alle Faktoren.</p>
             <p>Ein Zusammenhang ist noch keine Ursache, und nichts davon ersetzt ärztlichen Rat.</p>
           </div>
         </details>
       ` : null}
-      ${!ins && !state.insightsBusy ? html`<section class="card stack"><p class="muted">Noch keine Analyse.</p><button class="btn" onClick=${() => navigate('check')}>Zum Check-in</button></section>` : null}
+      ${!ins && !state.insightsBusy ? html`<section class="card stack"><p class="muted">Noch keine Analyse.</p><button class="btn" onClick=${() => openCheck()}>Check-in öffnen</button></section>` : null}
     </main>`;
 }

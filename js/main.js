@@ -1,7 +1,7 @@
 // Einstieg der Web-App.
 import { html, render } from './vendor/preact-htm.js';
 import { App } from './ui/app.js';
-import { boot, state, recompute, navigate, toast } from './ui/state.js';
+import { boot, state, recompute, navigate, parseRoute, toast } from './ui/state.js';
 import { todayKey } from './core/time.js';
 
 const preview = Boolean(globalThis.FORMKURVE_PREVIEW);
@@ -32,8 +32,9 @@ document.addEventListener('visibilitychange', () => {
 });
 
 window.addEventListener('hashchange', () => {
-  const r = location.hash.replace('#', '');
-  if (r) navigate(r);
+  if (!location.hash) return;
+  const { route, sub } = parseRoute(location.hash);
+  navigate(route, sub);
 });
 
 if (!preview && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

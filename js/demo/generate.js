@@ -396,5 +396,98 @@ export function generateDemo({ days = 90, endDate = todayKey(), seed = 11, nowMs
     if (Object.keys(a).length) survey.set(d, { a, ts, backfilled: {} });
   });
 
-  return { samples, workouts, survey, context, startDate, endDate };
+  const journal = demoJournal({ dates, behavior, nightInfo, endDate, nowMs, seed, at });
+  return { samples, workouts, survey, journal, context, startDate, endDate };
+}
+
+/**
+ * Logbuch für alle Tage, passend zum Verhalten oben: Wasser im Bereich der Abendcheck-Antwort,
+ * Koffein mit derselben Anzahl und Uhrzeit, Spaziergänge, Arbeitsstunden, Glück und ein paar Tagebuchzeilen.
+ * Eigener Zufallsstrom, damit alle übrigen Beispieldaten gleich bleiben.
+ */
+function demoJournal({ dates, behavior, nightInfo, endDate, nowMs, seed, at }) {
+  const rnd = mulberry32(seed + 202);
+  const chance = (p) => rnd() < p;
+  const gauss = () => {
+    let u = 0;
+    let v = 0;
+    while (!u) u = rnd();
+    while (!v) v = rnd();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  const N = (m, sd) => m + sd * gauss();
+  const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
+  const hm = (m) => minutesToHm(m);
+  const out = new Map();
+  let n = 0;
+  const from = 1;
+  const TEXT = {
+    kraft: ['Krafttraining: Kniebeugen und Bankdrücken, lief gut.', 'Beine trainiert. Zäh, aber geschafft.', 'Oberkörper im Studio, neue Bestleistung beim Rudern.'],
+    ausdauer: ['Abends gelaufen, ruhiges Tempo, Kopf war danach frei.', 'Lange Runde mit dem Rad, schönes Licht.'],
+    hiit: ['Kurzes Intervalltraining, danach komplett platt.'],
+    team: ['Fußball mit den Jungs, 2:1 gewonnen.'],
+    mobility: ['Yoga am Abend, Rücken fühlt sich besser an.'],
+    party: ['Geburtstag bei Freunden, viel gelacht, viel zu spät ins Bett.', 'Abends unterwegs gewesen. Morgen wird es zäh.'],
+    exam: ['Prüfungsvorbereitung, fast den ganzen Tag am Schreibtisch.', 'Deadline-Stress. Wenigstens ist der Entwurf fertig.'],
+    sick: ['Halsschmerzen und schlapp. Früh ins Bett.', 'Immer noch erkältet, nur Tee und Sofa.'],
+    weekend: ['Ausgeschlafen und lange gefrühstückt.', 'Spaziergang am See, viel draußen gewesen.', 'Familie besucht, entspannter Tag.'],
+    work: ['Ruhiger Bürotag.', 'Viel geschafft heute, guter Tag.', 'Etwas müde, aber okay.', 'Langes Meeting, danach gekocht und früh ins Bett.', 'Neues Projekt gestartet, bin gespannt.'],
+  };
+  for (let i = from; i < dates.length; i++) {
+    const d = dates[i];
+    const b = behavior.get(d);
+    const night = nightInfo.get(d);
+    const isToday = d === endDate;
+    const nowMin = isToday ? Math.floor((nowMs - at(d, 0)) / 60000) : 26 * 60;
+    const rec = { e: {}, x: {}, f: {} };
+    const put = (entry, minutes) => {
+      if (minutes > nowMin) return;
+      rec.e[`demo${(n++).toString(36)}`] = { ...entry, at: hm(minutes), u: at(d, minutes) };
+    };
+    const field = (name, v, minutes) => {
+      if (minutes > nowMin) return;
+      rec.f[name] = { v, u: at(d, minutes) };
+    };
+    // Wasser: Summe im Bereich der Antwort „Getrunken“
+    const target = b.hydration === 'lt15' ? 900 + Math.floor(rnd() * 11) * 50 : b.hydration === 'gt25' ? 2600 + Math.floor(rnd() * 13) * 50 : 1600 + Math.floor(rnd() * 17) * 50;
+    let total = 0;
+    let t = 7 * 60 + 20 + Math.floor(rnd() * 30);
+    while (target - total >= 50) {
+      let ml = pick([250, 250, 300, 500]);
+      // Der letzte Schluck macht die Summe genau voll, damit sie im Bereich der Antwort bleibt
+      if (target - total - ml < 50) ml = target - total;
+      put({ type: 'water', ml }, t);
+      total += ml;
+      t = Math.min(22 * 60, t + 70 + Math.floor(rnd() * 90));
+    }
+    // Koffein: gleiche Anzahl und letzte Uhrzeit wie im Verhalten
+    if (b.caf === 0) field('noCaffeine', true, 20 * 60);
+    const spacing = b.caf > 1 ? Math.min(150, Math.max(25, (b.cafTime - 6 * 60 - 30) / (b.caf - 1))) : 0;
+    for (let k = 0; k < b.caf; k++) {
+      const minutes = Math.round(b.cafTime - spacing * (b.caf - 1 - k));
+      const kind = k === 0 ? pick(['kaffee', 'kaffee', 'milchkaffee']) : pick(['kaffee', 'espresso', 'espresso', 'schwarztee', 'milchkaffee']);
+      const mg = { kaffee: 90, espresso: 80, milchkaffee: 80, schwarztee: 45 }[kind];
+      put({ type: 'caffeine', kind, mg }, minutes);
+    }
+    // Spaziergänge (kein Training)
+    if (!b.sick && chance(b.weekend ? 0.6 : 0.35)) put({ type: 'sport', kind: 'gehen', min: pick([20, 30, 40, 45, 60]) }, b.weekend ? 15 * 60 + Math.floor(rnd() * 60) : 12 * 60 + 35);
+    // Arbeit
+    let work = 0;
+    if (!b.sick) {
+      if (b.wd >= 1 && b.wd <= 5) work = Math.round((b.wd === 5 ? N(6.8, 0.8) : N(8.3, 0.8)) * 2) / 2 + (b.exam ? 1.5 : 0);
+      else if (b.wd === 0 && chance(0.25)) work = pick([1.5, 2, 3]);
+    }
+    field('work', Math.max(0, Math.min(13, work)), 19 * 60 + 30);
+    // Glück: Schlaf der Nacht davor, Stress, Training, Wochenende, Alkohol am Vorabend, Krankheit
+    const prev = behavior.get(addDays(d, -1));
+    let happy = 6.7 - 0.45 * (b.stress - 3) + (b.training ? 0.7 : 0) + (b.weekend ? 0.5 : 0) - (night?.extraWakes || 0) * 0.35 - ((night?.latencyMin || 0) > 35 ? 0.5 : 0) - (prev?.drinks >= 3 ? 0.9 : 0) - (b.sick || night?.sick ? 2 : 0) - (b.exam ? 0.7 : 0) - (work >= 9.5 ? 0.6 : 0) + N(0, 0.9);
+    field('happy', Math.max(0, Math.min(10, Math.round(happy))), 21 * 60 + 40);
+    // Tagebuch an etwa jedem zweiten Tag
+    if (chance(0.5)) {
+      const key = b.sick ? 'sick' : b.party ? 'party' : b.exam ? 'exam' : b.training && chance(0.7) ? b.training.kind : b.weekend ? 'weekend' : 'work';
+      field('text', pick(TEXT[key] || TEXT.work), 21 * 60 + 45);
+    }
+    if (Object.keys(rec.e).length || Object.keys(rec.f).length) out.set(d, rec);
+  }
+  return out;
 }

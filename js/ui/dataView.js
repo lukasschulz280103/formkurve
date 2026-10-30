@@ -1,11 +1,13 @@
-// Ansicht "Daten": Import, Diagnose, Quellen, Kurzbefehl-Anleitung, Einstellungen, Backup.
+// Unterseiten im Reiter „Profil“: Konto, Daten importieren, Körperdaten, Umwelt, Einstellungen, Backup, Über Formkurve.
 import { html, useState, useRef } from '../vendor/preact-htm.js';
 import { APP_VERSION } from '../version.js';
-import { state, update, importShortcutText, importHealthExport, saveSettings, refreshContext, useCurrentLocation, tryDemo, leaveDemo, resetDemo, toast, recompute, signOut, deleteCurrentAccount, accounts } from './state.js';
+import { state, update, importShortcutText, importHealthExport, saveSettings, refreshContext, useCurrentLocation, leaveDemo, resetDemo, toast, recompute, signOut, deleteCurrentAccount, accounts, linkOnline, runSync, onlineReauth, onlineUnlink, onlineDelete, renewRecovery, wipeAllData } from './state.js';
 import { InfoButton } from './info.js';
-import { ProfileFields, Avatar } from './auth.js';
+import { ProfileFields, Avatar, PasswordField, validEmail } from './auth.js';
+import { syncConfig, configSource, parseFirebaseConfig, saveDeviceConfig, clearDeviceConfig, configFileContent, FIRESTORE_RULES } from '../sync/config.js';
 import { formatPlace } from '../context/location.js';
-import { Topbar, DemoBanner } from './today.js';
+import { SubTopbar, DemoBanner } from './today.js';
+import { JournalSettings } from './journalView.js';
 import { Segmented, Switch, Stepper, Progress } from './components.js';
 import { Icon } from './icons.js';
 import { num, ago, mb, dateShort } from './format.js';
@@ -98,7 +100,7 @@ function ShortcutGuide() {
       </ol>
       <p>Jede Zeile sieht dann etwa so aus:</p>
       <pre class="code">${EXAMPLE}</pre>
-      <p>Täglich: Kurzbefehl ausführen, Formkurve öffnen, <b>Einfügen und importieren</b>. Das Datumsformat darf auch deutsch sein (25.10.2026, 07:59); Werte mit Komma werden erkannt. Doppelte Zeilen schaden nicht.</p>
+      <p>Täglich: Kurzbefehl ausführen, Formkurve öffnen, <b>Einfügen und importieren</b> (der Hinweis auf „Heute“ oder hier oben). Das Datumsformat darf auch deutsch sein (25.10.2026, 07:59); Werte mit Komma werden erkannt. Doppelte Zeilen schaden nicht.</p>
       <p class="muted">Tipp: Eine Automation „Wenn Wecker gestoppt wird“ kann den Kurzbefehl starten. Läuft er dir zu langsam, stelle den Zeitraum auf 1 Tag. Für die Historie oder Lücken nimm den Health-Export.</p>
     </div>
   </details>`;
@@ -180,13 +182,13 @@ function ExportImport() {
   </div>`;
 }
 
-function Profile() {
+function BodyData() {
   const s = state.repo.settings;
   const set = (path, v) => saveSettings(setPath(s, path, v));
   const age = ageOf(s);
   const bmi = bmiOf(s);
   return html`<section class="card" id="profil">
-    <div class="card-head"><h2>Profil</h2><span class="tiny muted">alles freiwillig</span></div>
+    <div class="card-head"><h2>Über dich</h2><span class="tiny muted">alles freiwillig</span></div>
     <p class="small muted" style="margin-bottom:10px">Macht Normalwerte (Schlafdauer, Schritte, Maximalpuls) passend zu dir. Die Angaben bleiben verschlüsselt auf diesem Gerät.</p>
     <${ProfileFields} profile=${s.profile} onChange=${(k, v) => set(`profile.${k}`, v)} />
     <div class="list" style="margin-top:10px">
@@ -194,9 +196,18 @@ function Profile() {
       <div class="list-row"><span class="t row" style="gap:4px">Maximalpuls<${InfoButton} k="hrMax" value=${hrMaxOf(s)} label="Maximalpuls" /></span><${Stepper} id="hrmax" value=${s.profile.hrMax ?? hrMaxOf(s)} min=${130} max=${220} step=${1} onChange=${(v) => set('profile.hrMax', v || null)} />
         <span class="d">${s.profile.hrMax ? html`eigener Wert · <button class="linkbtn" onClick=${() => set('profile.hrMax', null)}>Schätzung nutzen</button>` : age ? 'geschätzt: 208 − 0,7 × Alter' : 'Standardwert 190, bis du dein Geburtsjahr einträgst'}</span></div>
       <div class="list-row"><span class="t row" style="gap:4px">Schlafbedarf (Basis)<${InfoButton} k="sleepNeed" value=${s.profile.sleepNeedBase} label="Schlafbedarf" /></span><${Stepper} id="need" value=${s.profile.sleepNeedBase} min=${5} max=${11} step=${0.25} unit="h" onChange=${(v) => v && set('profile.sleepNeedBase', v)} /></div>
+    </div>
+  </section>`;
+}
+
+function ImportSettings() {
+  const s = state.repo.settings;
+  return html`<section class="card">
+    <div class="card-head"><h2>Beim Import</h2></div>
+    <div class="list">
       <div class="list-row"><span class="t">HRV-Tagesversatz</span><span></span>
         <span class="d">Einschalten, falls Zepp HRV-Werte einen Tag zu früh einträgt.</span>
-        <div style="grid-column:1 / -1"><${Segmented} label="HRV-Tagesversatz" value=${s.import.hrvDayShift} onChange=${(v) => set('import.hrvDayShift', v)} options=${[{ value: 0, label: 'aus' }, { value: 1, label: '+1 Tag' }]} /></div></div>
+        <div style="grid-column:1 / -1"><${Segmented} label="HRV-Tagesversatz" value=${s.import.hrvDayShift} onChange=${(v) => saveSettings(setPath(s, 'import.hrvDayShift', v))} options=${[{ value: 0, label: 'aus' }, { value: 1, label: '+1 Tag' }]} /></div></div>
     </div>
   </section>`;
 }
@@ -334,29 +345,30 @@ function Account() {
   const renewCode = async () => {
     setErr(null);
     try {
-      setCode(await accounts.renewRecoveryCode(a.id, oldPin));
+      setCode(await renewRecovery(oldPin));
       setOldPin('');
     } catch (e) {
       setErr(e.message);
     }
   };
+  const linked = Boolean(state.sync?.linked);
   const pinInput = (id, label, value, set) => html`<label class="field-label" for=${id}>${label}<input id=${id} class="field pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" value=${value} onInput=${(e) => set(e.currentTarget.value.replace(/\D/g, '').slice(0, 8))} /></label>`;
   return html`<section class="card stack">
-    <div class="row" style="gap:12px"><${Avatar} a=${a} size=${44} /><div class="grow"><h2>${a.name}</h2><p class="tiny muted">Konto auf diesem Gerät · Daten verschlüsselt</p></div></div>
+    <div class="row" style="gap:12px"><${Avatar} a=${a} size=${44} /><div class="grow"><h2>${a.name}</h2><p class="tiny muted">${linked ? 'Online-Konto · Ende-zu-Ende verschlüsselt' : 'Konto auf diesem Gerät · Daten verschlüsselt'}</p></div></div>
     ${mode === 'pin' ? html`<div class="stack">
       ${pinInput('old-pin', 'Bisherige PIN', oldPin, setOldPin)}
       ${pinInput('new-pin', 'Neue PIN (4 bis 8 Ziffern)', newPin, setNewPin)}
       ${err ? html`<p class="small error-text">${err}</p>` : null}
       <div class="row"><button class="btn small primary" disabled=${oldPin.length < 4 || newPin.length < 4} onClick=${changePin}>PIN ändern</button><button class="btn small ghost" onClick=${reset}>Abbrechen</button></div>
     </div>` : mode === 'code' ? html`<div class="stack">
-      ${code ? html`<p class="small ink2">Dein neuer Wiederherstellungscode. Der alte gilt nicht mehr.</p><div class="code-box">${code}</div>
+      ${code ? html`<p class="small ink2">Dein neuer Wiederherstellungscode. Der alte gilt nicht mehr${linked ? ', auch nicht für neue Geräte' : ''}.</p><div class="code-box">${code}</div>
         <button class="btn small" onClick=${() => { setCode(null); reset(); }}>Gesichert, fertig</button>` : html`
         ${pinInput('code-pin', 'PIN zur Bestätigung', oldPin, setOldPin)}
         ${err ? html`<p class="small error-text">${err}</p>` : null}
         <div class="row"><button class="btn small primary" disabled=${oldPin.length < 4} onClick=${renewCode}>Neuen Code erzeugen</button><button class="btn small ghost" onClick=${reset}>Abbrechen</button></div>`}
     </div>` : mode === 'delete' ? html`<div class="confirm">
-      <b>Konto „${a.name}“ und alle Daten löschen?</b>
-      <p class="small ink2">Messwerte, Antworten und Einstellungen dieses Kontos verschwinden von diesem Gerät. Tippe den Namen zur Bestätigung.</p>
+      <b>Konto „${a.name}“ ${linked ? 'von diesem Gerät löschen?' : 'und alle Daten löschen?'}</b>
+      <p class="small ink2">${linked ? 'Messwerte, Antworten, Logbuch und Einstellungen verschwinden von diesem Gerät. Das Online-Konto und die anderen Geräte bleiben; löschen kannst du es unten bei „Auf mehreren Geräten“.' : 'Messwerte, Antworten, Logbuch und Einstellungen dieses Kontos verschwinden von diesem Gerät.'} Tippe den Namen zur Bestätigung.</p>
       <input class="field" value=${confirm} onInput=${(e) => setConfirm(e.currentTarget.value)} aria-label="Name zur Bestätigung" autocomplete="off" />
       <div class="row"><button class="btn small danger" disabled=${confirm.trim().toLocaleLowerCase('de-DE') !== a.name.toLocaleLowerCase('de-DE')} onClick=${deleteCurrentAccount}>Endgültig löschen</button><button class="btn small ghost" onClick=${reset}>Abbrechen</button></div>
     </div>` : html`<div class="row wrap">
@@ -365,6 +377,139 @@ function Account() {
       <button class="btn small ghost" onClick=${() => setMode('code')}>Neuer Wiederherstellungscode</button>
       <button class="btn small danger" onClick=${() => setMode('delete')}>Konto löschen</button>
     </div>`}
+  </section>`;
+}
+
+function SyncState({ sync }) {
+  const st = sync.state;
+  if (st === 'syncing') return html`<span class="sync-state"><i class="dot info"></i>gleicht ab …</span>`;
+  if (st === 'offline') return html`<span class="sync-state"><i class="dot warn"></i>offline, gleicht später ab</span>`;
+  if (st === 'reauth') return html`<span class="sync-state"><i class="dot warn"></i>Anmeldung nötig</span>`;
+  if (st === 'error') return html`<span class="sync-state"><i class="dot crit"></i>Fehler</span>`;
+  return html`<span class="sync-state"><i class="dot good"></i>${sync.lastSync ? `abgeglichen ${ago(sync.lastSync)}` : 'verbunden'}</span>`;
+}
+
+/** Einrichtung für Betreiber: Firebase-Zugang einfügen, Datei und Regeln für das Repository anzeigen. */
+function SyncSetup() {
+  const [text, setText] = useState('');
+  const [err, setErr] = useState(null);
+  const cfg = syncConfig();
+  const source = configSource();
+  const copy = async (t, what) => {
+    try {
+      await navigator.clipboard.writeText(t);
+      toast(`${what} kopiert`);
+    } catch {
+      toast('Kopieren nicht möglich, bitte markieren und kopieren.', 'error');
+    }
+  };
+  const save = () => {
+    setErr(null);
+    const parsed = parseFirebaseConfig(text);
+    if (!parsed) return setErr('apiKey und projectId nicht gefunden. Füge den ganzen Abschnitt „const firebaseConfig = { … }“ ein.');
+    try {
+      saveDeviceConfig(parsed);
+      location.reload();
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
+  return html`<details class="more" style="margin-top:8px">
+    <summary class="small">Online-Konten einrichten (für Betreiber) <${Icon} name="down" size=${16} /></summary>
+    <div class="stack small ink2" style="margin-top:8px">
+      ${cfg ? html`<p>Firebase-Projekt <b>${cfg.projectId}</b> ist ${source === 'site' ? 'für alle eingerichtet (Datei sync-config.js)' : 'nur auf diesem Gerät eingetragen'}.</p>` : html`<p>Einmalig ein kostenloses Firebase-Projekt anlegen; die Schritte stehen in der README. Dann hier den Abschnitt „const firebaseConfig = { … }“ aus Firebase einfügen.</p>`}
+      ${!cfg || source === 'device' ? html`<textarea class="field mono" rows="5" placeholder="const firebaseConfig = { apiKey: …, projectId: … }" value=${text} onInput=${(e) => setText(e.currentTarget.value)} aria-label="Firebase-Konfiguration"></textarea>
+        ${err ? html`<p class="error-text">${err}</p>` : null}
+        <button class="btn small" disabled=${text.trim().length < 20} onClick=${save}>Auf diesem Gerät verwenden</button>` : null}
+      ${cfg && source === 'device' ? html`<p>Damit alle Geräte und Freunde es nutzen: im Repository <b>Add file → Create new file</b>, Name <code>sync-config.js</code>, diesen Inhalt einfügen, <b>Commit changes</b>.</p>
+        <pre class="codeblock">${configFileContent(cfg)}</pre>
+        <div class="row wrap"><button class="btn small" onClick=${() => copy(configFileContent(cfg), 'Inhalt')}><${Icon} name="clipboard" size=${16} />Inhalt kopieren</button>
+        <button class="btn small ghost" onClick=${() => { clearDeviceConfig(); location.reload(); }}>Eintrag auf diesem Gerät entfernen</button></div>` : null}
+      <p>Firestore-Regeln (Firestore Database → Regeln):</p>
+      <pre class="codeblock">${FIRESTORE_RULES}</pre>
+      <button class="btn small ghost" style="justify-self:start" onClick=${() => copy(FIRESTORE_RULES, 'Regeln')}><${Icon} name="clipboard" size=${16} />Regeln kopieren</button>
+    </div>
+  </details>`;
+}
+
+/** Auf mehreren Geräten: Online-Konto verbinden, Status, neu anmelden, lösen, löschen. */
+function Online() {
+  const [mode, setMode] = useState(null);
+  const [email, setEmail] = useState('');
+  const [pw, setPw] = useState('');
+  const [pw2, setPw2] = useState('');
+  const [err, setErr] = useState(null);
+  if (state.demo || state.preview) return null;
+  const cfg = syncConfig();
+  const sync = state.sync;
+  const linked = Boolean(sync?.linked);
+  const reset = () => {
+    setMode(null);
+    setPw('');
+    setPw2('');
+    setErr(null);
+  };
+  const run = async (fn) => {
+    setErr(null);
+    try {
+      await fn();
+      reset();
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
+  const head = html`<div class="card-head" style="margin-bottom:0"><h2 class="row" style="gap:6px"><${Icon} name="cloud" size=${20} />Auf mehreren Geräten</h2>${linked ? html`<${SyncState} sync=${sync} />` : null}</div>`;
+  if (!cfg) {
+    return html`<section class="card stack">
+      ${head}
+      <p class="small ink2">Mit einem Online-Konto (E-Mail und Passwort) nutzt du dieselben Daten auf iPhone, iPad und Mac, auch gleichzeitig. Dafür braucht diese Seite einmalig ein kostenloses Firebase-Projekt.</p>
+      <${SyncSetup} />
+    </section>`;
+  }
+  if (!linked) {
+    return html`<section class="card stack">
+      ${head}
+      <p class="small ink2">Verbinde dieses Konto mit E-Mail und Passwort. Alles wird auf diesem Gerät verschlüsselt und dann hochgeladen; der Server sieht nur unlesbare Blöcke. Weitere Geräte melden sich mit E-Mail, Passwort und einmal deinem Wiederherstellungscode an.</p>
+      ${mode === 'link' ? html`<form class="stack" onSubmit=${(e) => { e.preventDefault(); if (pw !== pw2) return setErr('Die beiden Passwörter stimmen nicht überein.'); run(() => linkOnline(email, pw)); }}>
+        <label class="field-label" for="d-email">E-Mail<input id="d-email" class="field" type="email" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" value=${email} onInput=${(e) => setEmail(e.currentTarget.value)} /></label>
+        <${PasswordField} id="d-pw" label="Passwort (mindestens 8 Zeichen)" value=${pw} onInput=${setPw} autoComplete="new-password" />
+        <${PasswordField} id="d-pw2" label="Passwort wiederholen" value=${pw2} onInput=${setPw2} autoComplete="new-password" />
+        ${err ? html`<p class="small error-text" role="alert">${err}</p>` : null}
+        <div class="row"><button class="btn small primary" type="submit" disabled=${!validEmail(email) || pw.length < 8 || pw2.length < 8}>Verbinden und hochladen</button><button type="button" class="btn small ghost" onClick=${reset}>Abbrechen</button></div>
+      </form>` : html`<button class="btn small primary" style="justify-self:start" onClick=${() => setMode('link')}><${Icon} name="cloud" size=${16} />Online-Konto verbinden</button>`}
+      <p class="tiny muted">Gibt es schon ein Online-Konto (etwa vom iPad)? Dann hier abmelden und auf der Startseite „Mit Online-Konto anmelden“ wählen.</p>
+      ${configSource() === 'device' ? html`<${SyncSetup} />` : null}
+    </section>`;
+  }
+  return html`<section class="card stack">
+    ${head}
+    <dl class="kv">
+      <dt>E-Mail</dt><dd class="small">${sync.email}</dd>
+      ${sync.error && sync.state !== 'idle' && sync.state !== 'syncing' ? html`<dt>Hinweis</dt><dd class="small">${sync.error}</dd>` : null}
+    </dl>
+    ${sync.state === 'reauth' ? html`<form class="stack" onSubmit=${(e) => { e.preventDefault(); run(() => onlineReauth(pw)); }}>
+      <p class="small ink2">Das Passwort wurde geändert oder die Anmeldung ist abgelaufen. Melde dich neu an; die Daten bleiben.</p>
+      <${PasswordField} id="d-re" label="Passwort" value=${pw} onInput=${setPw} />
+      ${err ? html`<p class="small error-text" role="alert">${err}</p>` : null}
+      <button class="btn small primary" type="submit" style="justify-self:start" disabled=${pw.length < 6}>Neu anmelden</button>
+    </form>` : null}
+    ${mode === 'unlink' ? html`<div class="confirm">
+      <b>Verbindung auf diesem Gerät lösen?</b>
+      <p class="small ink2">Die Daten bleiben hier und in der Cloud. Dieses Gerät gleicht dann nicht mehr ab.</p>
+      ${err ? html`<p class="small error-text">${err}</p>` : null}
+      <div class="row"><button class="btn small" onClick=${() => run(onlineUnlink)}>Verbindung lösen</button><button class="btn small ghost" onClick=${reset}>Abbrechen</button></div>
+    </div>` : mode === 'delete' ? html`<form class="confirm" onSubmit=${(e) => { e.preventDefault(); run(() => onlineDelete(pw)); }}>
+      <b>Online-Konto und alle Daten in der Cloud löschen?</b>
+      <p class="small ink2">Andere Geräte gleichen danach nicht mehr ab; ihre Daten bleiben dort. Dieses Gerät behält seine Daten als Konto nur auf diesem Gerät.</p>
+      <${PasswordField} id="d-del" label="Passwort zur Bestätigung" value=${pw} onInput=${setPw} />
+      ${err ? html`<p class="small error-text" role="alert">${err}</p>` : null}
+      <div class="row"><button class="btn small danger" type="submit" disabled=${pw.length < 6}>Online-Konto löschen</button><button type="button" class="btn small ghost" onClick=${reset}>Abbrechen</button></div>
+    </form>` : html`<div class="row wrap">
+      <button class="btn small" disabled=${sync.state === 'syncing' || sync.state === 'reauth'} onClick=${() => runSync()}><${Icon} name="sync" size=${16} />Jetzt abgleichen</button>
+      <button class="btn small ghost" onClick=${() => setMode('unlink')}>Verbindung lösen</button>
+      <button class="btn small danger" onClick=${() => setMode('delete')}>Online-Konto löschen</button>
+    </div>`}
+    <p class="tiny muted">Neues Gerät: dort „Mit Online-Konto anmelden“, dann E-Mail, Passwort und einmal der Wiederherstellungscode. Umweltdaten lädt jedes Gerät selbst.</p>
   </section>`;
 }
 
@@ -449,17 +594,21 @@ function Backup() {
       update({ busy: null });
     }
   };
+  const linked = Boolean(state.sync?.linked);
   const wipe = async () => {
-    await state.repo.clearAll();
-    recompute();
-    setAsking(false);
-    setConfirm('');
-    toast('Alle Daten gelöscht');
+    try {
+      await wipeAllData();
+      setAsking(false);
+      setConfirm('');
+      toast(linked ? 'Daten auf allen Geräten gelöscht' : 'Alle Daten gelöscht');
+    } catch (e) {
+      toast(e.message || 'Löschen fehlgeschlagen', 'error');
+    }
   };
   const last = state.repo.meta.lastBackup;
   return html`<section class="card" id="backup">
     <div class="card-head"><h2>Backup</h2>${last ? html`<span class="tiny muted">zuletzt ${ago(last)}</span>` : null}</div>
-    <p class="small muted" style="margin-bottom:10px">Deine Antworten aus den Checks gibt es nur hier. Messwerte lassen sich jederzeit neu aus Apple Health holen.</p>
+    <p class="small muted" style="margin-bottom:10px">${linked ? 'Dein Online-Konto hält die Daten auf allen Geräten aktuell. Ein Backup ist eine zusätzliche Kopie als Datei.' : 'Deine Antworten aus den Checks und dein Logbuch gibt es nur hier. Messwerte lassen sich jederzeit neu aus Apple Health holen.'}</p>
     <div class="list">
       <div class="list-row"><span class="t">Messwerte einschließen</span><${Switch} id="raw" label="Messwerte einschließen" checked=${raw} onChange=${setRaw} /><span class="d">Macht die Datei deutlich größer.</span></div>
     </div>
@@ -472,22 +621,32 @@ function Backup() {
     <hr class="divider" />
     ${!asking ? html`<button class="btn small danger" onClick=${() => setAsking(true)}>Alle Daten löschen</button>` : html`<div class="confirm">
       <b>Wirklich alle ${state.demo ? 'Beispieldaten' : 'Daten'} löschen?</b>
-      <p class="small ink2">Messwerte, Antworten, Umweltdaten und Einstellungen ${state.demo ? 'der Beispieldaten' : html`im Konto „${state.account?.name}“`}. Das Konto selbst bleibt. Tippe LÖSCHEN zur Bestätigung.</p>
+      <p class="small ink2">${linked ? 'Messwerte, Workouts, Antworten und Logbuch auf allen verbundenen Geräten und in der Cloud, dazu die Umweltdaten hier. Einstellungen und Konto bleiben.' : html`Messwerte, Antworten, Logbuch, Umweltdaten und Einstellungen ${state.demo ? 'der Beispieldaten' : html`im Konto „${state.account?.name}“`}. Das Konto selbst bleibt.`} Tippe LÖSCHEN zur Bestätigung.</p>
       <input class="field" value=${confirm} onInput=${(e) => setConfirm(e.currentTarget.value)} aria-label="Bestätigung" autocomplete="off" />
       <div class="row"><button class="btn small danger" disabled=${confirm.trim().toUpperCase() !== 'LÖSCHEN'} onClick=${wipe}>Endgültig löschen</button><button class="btn small ghost" onClick=${() => { setAsking(false); setConfirm(''); }}>Abbrechen</button></div>
     </div>`}
   </section>`;
 }
 
-export function DataView() {
-  const repo = state.repo;
+// ---------- Unterseiten ----------
+
+export function AccountPage() {
   return html`
-    <${Topbar} title="Daten" sub=${repo.index.lastSample ? `Letzte Messung ${ago(repo.index.lastSample)}` : 'Noch keine Messwerte'} />
+    <${SubTopbar} title="Konto" sub=${state.demo ? 'Beispieldaten' : state.account?.name} />
     <main class="view">
       <${DemoBanner} />
       <${Account} />
+      <${Online} />
+    </main>`;
+}
+
+export function DataPage() {
+  const repo = state.repo;
+  return html`
+    <${SubTopbar} title="Daten importieren" sub=${repo.index.lastSample ? `Letzte Messung ${ago(repo.index.lastSample)}` : 'Noch keine Messwerte'} />
+    <main class="view">
+      <${DemoBanner} />
       <section class="card stack">
-        <div class="card-head" style="margin-bottom:0"><h2>Daten importieren</h2></div>
         ${state.preview ? html`<p class="small ink2">In dieser Vorschau laufen nur Beispieldaten. Deine echten Daten importierst du in der installierten App auf deinem iPhone; die Anleitung steht in der README.</p>` : html`
         <${PasteImport} />
         <hr class="divider" style="margin:4px 0" />
@@ -497,19 +656,63 @@ export function DataView() {
       <${ShortcutGuide} />
       <${Diagnose} />
       <${Sources} />
-      <${Profile} />
+      <${ImportSettings} />
+    </main>`;
+}
+
+export function BodyPage() {
+  return html`
+    <${SubTopbar} title="Körperdaten" sub="Alter, Geschlecht, Größe, Gewicht" />
+    <main class="view">
+      <${DemoBanner} />
+      <${BodyData} />
+    </main>`;
+}
+
+export function EnvironmentPage() {
+  const place = state.repo.settings.context.place;
+  return html`
+    <${SubTopbar} title="Umwelt und Standort" sub=${place ? formatPlace(place) : 'Wetter, Feinstaub, Pollen'} />
+    <main class="view">
+      <${DemoBanner} />
       <${Environment} />
+    </main>`;
+}
+
+export function SettingsPage() {
+  return html`
+    <${SubTopbar} title="Einstellungen" sub="Anzeige, Check-in, Logbuch, Modell" />
+    <main class="view">
+      <${DemoBanner} />
       <${Preferences} />
+      <${JournalSettings} settings=${state.repo.settings} />
       <${ModelParams} />
+    </main>`;
+}
+
+export function BackupPage() {
+  const last = state.repo.meta.lastBackup;
+  return html`
+    <${SubTopbar} title="Backup und Löschen" sub=${last ? `Letztes Backup ${ago(last)}` : 'Noch kein Backup'} />
+    <main class="view">
+      <${DemoBanner} />
       <${Backup} />
       ${state.demo && !state.preview ? html`<section class="card stack">
         <div class="card-head" style="margin-bottom:0"><h2>Beispieldaten</h2></div>
         <p class="small muted">90 erfundene Tage mit eingebauten Effekten, getrennt von allen Konten gespeichert.</p>
         <button class="btn small ghost" onClick=${resetDemo}>Neu erzeugen</button>
       </section>` : null}
+    </main>`;
+}
+
+export function AboutPage() {
+  const repo = state.repo;
+  return html`
+    <${SubTopbar} title="Über Formkurve" sub=${`Version ${APP_VERSION}`} />
+    <main class="view">
       <section class="card stack small ink2">
-        <div class="card-head" style="margin-bottom:0"><h2>Über Formkurve</h2><span class="tiny muted">Version ${APP_VERSION}</span></div>
-        <p>Eine private Web-App ohne Server. Konten und Daten liegen verschlüsselt in diesem Browser auf deinem Gerät${repo.persistent ? '' : ' (hier nur im Arbeitsspeicher, nach dem Schließen weg)'}. Freunde nutzen denselben Link und legen auf ihrem Gerät ein eigenes Konto an.</p>
+        <p>Eine private Web-App. Konten und Daten liegen verschlüsselt in diesem Browser auf deinem Gerät${repo.persistent ? '' : ' (hier nur im Arbeitsspeicher, nach dem Schließen weg)'}; mit Online-Konto zusätzlich Ende-zu-Ende verschlüsselt bei Firebase, damit mehrere Geräte denselben Stand haben. Freunde nutzen denselben Link und legen ein eigenes Konto an.</p>
+        <p>Das Logbuch hält fest, was die Messung nicht sieht: Wasser, Koffein, Glück, Sport, Arbeitszeit und dein Tagebuch. Was dort steht, fragt der Abendcheck nicht noch einmal.</p>
         <p>Die Scores sind eine eigene Heuristik und keine medizinische Bewertung. Die Normalwerte hinter den (i)-Punkten stammen von offiziellen Stellen oder sind als Studie gekennzeichnet. Bei Beschwerden zählt ärztlicher Rat, nicht die App.</p>
         <p class="tiny muted">Enthält Preact und htm (MIT) sowie fflate (MIT). ${ATTRIBUTION}</p>
       </section>
