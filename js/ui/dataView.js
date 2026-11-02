@@ -57,6 +57,42 @@ function Diagnose() {
  * Die letzten Nächte mit genau den Werten, die Recovery braucht. Zeigt auf einen Blick,
  * ob ein Wert fehlt oder ob nur der Vergleich mit den Nächten davor noch zu kurz ist.
  */
+/**
+ * Liegt die HRV im Schlaffenster oder erst am Vortag? Vergleicht beide Fenster direkt in den
+ * Rohdaten, unabhängig davon, wie der Tagesversatz gerade steht.
+ */
+function hrvAlignment(dates) {
+  const idx = state.repo.index;
+  const DAY = 86400000;
+  let nights = 0;
+  let imFenster = 0;
+  let amVortag = 0;
+  for (const k of dates) {
+    const d = state.results.days.get(k);
+    if (!d?.realNight || !d.window) continue;
+    nights++;
+    const [from, to] = d.window;
+    if (idx.window('hrv', from, to).v.length) imFenster++;
+    if (idx.window('hrv', from - DAY, to - DAY).v.length) amVortag++;
+  }
+  return { nights, imFenster, amVortag };
+}
+
+function DayShiftCheck({ dates }) {
+  const s = state.repo.settings;
+  const an = (s.import.hrvDayShift || 0) === 1;
+  const { nights, imFenster, amVortag } = hrvAlignment(dates);
+  if (nights < 2 || (!imFenster && !amVortag)) return null;
+  const passt = imFenster >= amVortag;
+  const ok = passt !== an;
+  const text = passt
+    ? `HRV liegt bei ${imFenster} von ${nights} Nächten im Schlaffenster${an ? '. Der Tagesversatz darf aus bleiben.' : ' – der Tagesversatz ist richtig aus.'}`
+    : `HRV liegt bei ${amVortag} von ${nights} Nächten erst am Vortag${an ? ' – der Tagesversatz ist richtig auf „+1 Tag“.' : '. Stell den HRV-Tagesversatz unten auf „+1 Tag“.'}`;
+  return html`<div class="row small" style="margin-top:10px;align-items:flex-start;gap:8px">
+    <span class=${ok ? 'ok' : 'bad'}><${Icon} name=${ok ? 'ok' : 'alert'} size=${16} /></span><span>${text}</span>
+  </div>`;
+}
+
 function NightCheck() {
   const dates = state.results.dates.slice(-14).reverse();
   if (!dates.length) return null;
@@ -79,6 +115,7 @@ function NightCheck() {
         </tr>`;
       })}</tbody>
     </table></div>
+    <${DayShiftCheck} dates=${dates} />
     <p class="tiny muted" style="margin-top:8px">Ruhepuls ohne Stern stammt aus dem Puls im Schlaf, mit Stern aus dem Feld „Ruhepuls“ von Apple Health.</p>
   </section>`;
 }

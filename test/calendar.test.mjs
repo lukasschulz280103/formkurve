@@ -127,3 +127,36 @@ test('Fehlende Tagesform: die App nennt den Grund', () => {
   assert.equal(formGap({ form: 68 }, s), null);
   assert.equal(formGap(null, s).short, 'Keine Daten');
 });
+
+test('Vergleichsnächte werden auch unterhalb der Mindestzahl gezählt', async () => {
+  const { computeAll } = await import('../js/model/pipeline.js');
+  const { RawIndex, groupSamples, mergeBucket } = await import('../js/data/rawindex.js');
+  const { mergeSettings } = await import('../js/core/config.js');
+  // Drei Nächte mit HRV, Puls und Schlaf, wie bei einem Band, das seit Freitag getragen wird
+  const samples = [];
+  const nights = ['2026-10-31', '2026-11-01', '2026-11-02'];
+  for (const d of nights) {
+    const wake = new Date(`${d}T07:00:00`).getTime();
+    const onset = wake - 8 * 3600000;
+    samples.push({ type: 'sleep', t: onset, e: wake, v: 1, src: 'Zepp' });
+    samples.push({ type: 'hrv', t: onset + 2 * 3600000, e: onset + 2 * 3600000, v: 80, src: 'Zepp' });
+    for (let i = 0; i < 48; i++) {
+      const t = onset + i * 600000;
+      samples.push({ type: 'hr', t, e: t, v: 46 + (i % 6), src: 'Zepp' });
+    }
+  }
+  const buckets = [];
+  for (const [key, list] of groupSamples(samples)) {
+    const [type, date, src] = key.split('|');
+    const m = mergeBucket(null, list);
+    buckets.push({ type, date, src, t: m.t, e: m.e, v: m.v });
+  }
+  const res = computeAll({ index: new RawIndex(buckets), workouts: new Map(), survey: new Map(), journal: new Map(), context: new Map(), settings: mergeSettings(), today: '2026-11-02' });
+  // Jede Nacht hat Werte, und die Zahl der Vergleichsnächte wächst mit
+  for (const d of nights) assert.ok(res.days.get(d).hrv > 0, `HRV am ${d}`);
+  assert.deepEqual(nights.map((d) => res.days.get(d).baselineDays), [0, 1, 2]);
+  // Unter fünf Nächten gibt es noch keine Recovery und keine Tagesform
+  assert.equal(res.days.get('2026-11-02').recovery, null);
+  assert.equal(res.days.get('2026-11-02').form, null);
+  assert.equal(formGap(res.days.get('2026-11-02'), mergeSettings()).title, 'Noch zu wenige Nächte zum Vergleich (2 von 5)');
+});

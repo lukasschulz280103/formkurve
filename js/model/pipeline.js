@@ -177,12 +177,16 @@ export function computeAll({ index, workouts = [], survey = new Map(), journal =
     const lo = Math.max(0, i - W);
     d.base = {};
     d.z = {};
+    d.baseN = {};
     for (const k of Object.keys(series)) {
-      const b = baselineOf(series[k].slice(lo, i), m.baselineMinUsable);
+      const prior = series[k].slice(lo, i);
+      const b = baselineOf(prior, m.baselineMinUsable);
       d.base[k] = b;
+      // Zahl der brauchbaren Nächte davor, auch unterhalb der Mindestzahl (sonst stünde dort 0)
+      d.baseN[k] = prior.reduce((n, v) => n + (isNum(v) ? 1 : 0), 0);
       d.z[k === 'lnHrv' ? 'hrv' : k] = zScore(d[k], b, Z_FLOOR[k]);
     }
-    const nBase = Math.max(d.base.lnHrv?.n || 0, d.base.rhr?.n || 0);
+    const nBase = Math.max(d.baseN.lnHrv, d.baseN.rhr);
     d.baselineDays = nBase;
     d.calibrated = nBase >= m.baselineMinDays;
   }
