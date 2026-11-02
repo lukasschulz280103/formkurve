@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { monthGrid, monthStats, monthLabel, monthLast, monthOf, shiftMonth, levelOf, scoreEdges } from '../js/model/calendar.js';
 import { pendingChecks } from '../js/survey/engine.js';
 import { DEFAULTS } from '../js/core/config.js';
+import { formGap } from '../js/model/hints.js';
 
 test('Kalender: Raster beginnt montags und deckt den ganzen Monat ab', () => {
   const g = monthGrid('2026-10');
@@ -107,4 +108,22 @@ test('Offene Checks: Nachtragefenster und Beginn des Kontos', () => {
   // Ein größeres Fenster liefert mehr Tage
   const weit = { ...DEFAULTS, survey: { ...DEFAULTS.survey, backfillDays: 5 } };
   assert.equal(pendingChecks(leer, opts({ now: at(20), settings: weit })).length, 12);
+});
+
+test('Fehlende Tagesform: die App nennt den Grund', () => {
+  const s = DEFAULTS;
+  // Nacht ohne HRV und ohne Ruhepuls
+  const ohneWerte = formGap({ form: null, hrv: null, rhr: null, sleep: { asleepMin: 480 }, base: {}, baselineDays: 0 }, s);
+  assert.equal(ohneWerte.short, 'Nachtwerte fehlen');
+  assert.match(ohneWerte.text, /Zepp/);
+  // Werte da, aber noch zu wenige Nächte davor
+  const ohneVergleich = formGap({ form: null, hrv: 42, rhr: 54, sleep: { asleepMin: 480 }, base: {}, baselineDays: 3 }, s);
+  assert.equal(ohneVergleich.short, 'Vergleichswerte fehlen');
+  assert.match(ohneVergleich.title, /3 von 5/);
+  // Wert und Vergleich passen nicht zusammen
+  const gemischt = formGap({ form: null, hrv: null, rhr: 54, sleep: {}, base: { lnHrv: { n: 9 } }, baselineDays: 9 }, s);
+  assert.equal(gemischt.short, 'Vergleich unvollständig');
+  // Mit Tagesform gibt es keinen Grund, ohne Tag einen eigenen
+  assert.equal(formGap({ form: 68 }, s), null);
+  assert.equal(formGap(null, s).short, 'Keine Daten');
 });

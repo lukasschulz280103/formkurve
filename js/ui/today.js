@@ -8,7 +8,7 @@ import { InfoButton } from './info.js';
 import { Icon } from './icons.js';
 import { num, hours, clock, dayLabel, dateFull, signed, ago } from './format.js';
 import { addDays } from '../core/time.js';
-import { summarize } from '../model/hints.js';
+import { summarize, formGap } from '../model/hints.js';
 import { slotDone } from '../survey/engine.js';
 import { WORKOUT_LABEL } from '../data/normalize.js';
 import { formatPlace } from '../context/location.js';
@@ -258,6 +258,8 @@ export function TodayView() {
   const hasAny = state.results.dates.length > 0 && state.repo.buckets.size > 0;
   const lastSample = state.repo.index.lastSample;
   const firstDay = firstDataDay();
+  // Fehlt die Tagesform, sagt die App warum: fehlende Nachtwerte oder noch zu wenig Vergleich
+  const gap = d && d.form == null ? formGap(d, settings) : null;
   const now = new Date();
   const gate = isToday && settings.display.hideScoresUntilMorning && !slotDone(state.repo.survey, date, 'morning') && !state.showScoresAnyway && now.getHours() < settings.survey.morningUntilHour && d && (d.recovery != null || d.sleep);
   const showEvening = isToday && now.getHours() >= 17 && !slotDone(state.repo.survey, date, 'evening');
@@ -324,12 +326,13 @@ export function TodayView() {
         <section class="hero" aria-label="Tagesform">
           <${Dial} value=${d.form} marks=${[settings.model.recovery.red, settings.model.recovery.green]} muted=${!d.calibrated} />
           <div class="hero-meta">
-            ${zone ? html`<${StatusChip} zone=${zone} text=${zone === 'high' ? 'Bereit' : zone === 'mid' ? 'Ausgewogen' : 'Erholung zuerst'} />` : html`<span class="status c-info"><${Icon} name="info" size=${15} />Keine Daten für diese Nacht</span>`}
+            ${zone ? html`<${StatusChip} zone=${zone} text=${zone === 'high' ? 'Bereit' : zone === 'mid' ? 'Ausgewogen' : 'Erholung zuerst'} />` : html`<span class="status c-info"><${Icon} name="info" size=${15} />${gap?.short || 'Keine Tagesform'}</span>`}
             ${formDelta != null ? html`<span class="delta">${signed(formDelta)} zum Vortag</span>` : null}
             ${!d.calibrated && d.form != null ? html`<span class="delta">vorläufig</span>` : null}
             <${InfoButton} k="form" value=${d.form} label="Tagesform" />
           </div>
-          ${d.form != null ? html`<p class="hero-text">${summarize(d, settings)}</p>` : html`<p class="hero-text">${isToday ? 'Für letzte Nacht liegen noch keine Messwerte vor. Importiere die Daten von heute Morgen.' : 'Für diesen Tag fehlen Messwerte.'}</p>`}
+          ${d.form != null ? html`<p class="hero-text">${summarize(d, settings)}</p>`
+            : html`<p class="hero-text"><b>${gap.title}.</b> ${gap.text}${gap.short === 'Nachtwerte fehlen' || gap.short === 'Vergleichswerte fehlen' ? html` <button type="button" class="linkbtn" onClick=${() => navigate('profil', 'daten')}>Die letzten Nächte prüfen</button>` : null}</p>`}
         </section>
         <section class="rings" aria-label="Tageswerte">
           <div class="ring-tile">

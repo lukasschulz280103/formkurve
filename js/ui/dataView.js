@@ -10,7 +10,7 @@ import { SubTopbar, DemoBanner } from './today.js';
 import { JournalSettings } from './journalView.js';
 import { Segmented, Switch, Stepper, Progress } from './components.js';
 import { Icon } from './icons.js';
-import { num, ago, mb, dateShort } from './format.js';
+import { num, ago, mb, hours, dateShort } from './format.js';
 import { TYPES } from '../data/normalize.js';
 import { PARAMS, DEFAULTS, getPath, setPath, hrMaxOf, clone, ageOf, bmiOf } from '../core/config.js';
 import { searchPlace, ATTRIBUTION } from '../context/weather.js';
@@ -50,6 +50,36 @@ function Diagnose() {
       ${REQUIRED.map((t) => html`<div class="row"><span class=${idx.counts[t] ? 'ok' : 'bad'}><${Icon} name=${idx.counts[t] ? 'ok' : 'alert'} size=${16} /></span>
         <span>${TYPES[t].label}: ${idx.counts[t] ? 'vorhanden' : 'fehlt – für Recovery nötig. Prüfe die Zepp-Freigaben in Health.'}</span></div>`)}
     </div>
+  </section>`;
+}
+
+/**
+ * Die letzten Nächte mit genau den Werten, die Recovery braucht. Zeigt auf einen Blick,
+ * ob ein Wert fehlt oder ob nur der Vergleich mit den Nächten davor noch zu kurz ist.
+ */
+function NightCheck() {
+  const dates = state.results.dates.slice(-14).reverse();
+  if (!dates.length) return null;
+  const min = state.repo.settings.model.baselineMinUsable ?? 5;
+  const fehlt = (v, text) => (v == null ? html`<span class="bad">fehlt</span>` : text);
+  return html`<section class="card">
+    <div class="card-head"><h2>Die letzten Nächte</h2><span class="tiny muted">Grundlage der Recovery</span></div>
+    <p class="small ink2" style="margin-bottom:10px">Recovery und Tagesform brauchen je Nacht <b>HRV oder Ruhepuls</b> und dazu mindestens ${min} Nächte davor zum Vergleich. Fehlt eine Spalte durchgehend, kommt der Wert nicht aus Apple Health; steht in „Vgl.“ (Vergleichsnächte) eine kleine Zahl, fehlt nur noch Geschichte.</p>
+    <div class="tablewrap"><table class="data compact">
+      <thead><tr><th>Nacht</th><th>HRV<br /><span class="tiny muted">ms</span></th><th>Puls<br /><span class="tiny muted">bpm</span></th><th>Schlaf</th><th>Vgl.</th><th>Reco.</th></tr></thead>
+      <tbody>${dates.map((k) => {
+        const d = state.results.days.get(k);
+        return html`<tr>
+          <td>${dateShort(k)}</td>
+          <td class="tnum">${fehlt(d.hrv, num(d.hrv))}</td>
+          <td class="tnum">${fehlt(d.rhr, `${num(d.rhr)}${d.rhrSource === 'Apple Health' ? '*' : ''}`)}</td>
+          <td class="tnum">${d.sleep ? hours(d.sleep.asleepMin).replace(' h', '') : html`<span class="muted">–</span>`}</td>
+          <td class="tnum">${d.baselineDays || 0}</td>
+          <td class="tnum">${d.recovery == null ? html`<span class="muted">–</span>` : num(d.recovery)}</td>
+        </tr>`;
+      })}</tbody>
+    </table></div>
+    <p class="tiny muted" style="margin-top:8px">Ruhepuls ohne Stern stammt aus dem Puls im Schlaf, mit Stern aus dem Feld „Ruhepuls“ von Apple Health.</p>
   </section>`;
 }
 
@@ -655,6 +685,7 @@ export function DataPage() {
       </section>
       <${ShortcutGuide} />
       <${Diagnose} />
+      <${NightCheck} />
       <${Sources} />
       <${ImportSettings} />
     </main>`;

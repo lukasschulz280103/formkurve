@@ -2,7 +2,7 @@
 
 Persönliche Tagesform, Recovery, Schlaf und Strain aus den Daten deines Amazfit Helio Strap, dazu ein kurzer Morgen- und Abendcheck, ein Logbuch für Wasser, Koffein, Glück, Sport, Arbeitszeit und Tagebuch und eine Analyse, welche Gewohnheiten und Umweltfaktoren deine Werte bewegen. Eine Web-App: Jedes Konto besteht aus Name und PIN und liegt verschlüsselt auf dem Gerät. Wer will, verbindet es mit einem Online-Konto (E-Mail und Passwort) und nutzt es auf mehreren Geräten gleichzeitig; die Daten werden vorher auf dem Gerät verschlüsselt. Freunde nutzen denselben Link und legen ihr eigenes Konto an.
 
-Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.7.0.
+Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.7.1.
 
 ## Auf GitHub Pages bringen (kostenlos)
 
@@ -11,7 +11,7 @@ GitHub Pages braucht die Datei `index.html` ganz oben im Repository. Liegt sie e
 ### Erstes Hochladen (Windows)
 
 1. Auf github.com ein kostenloses Konto anlegen und ein neues Repository erstellen, Name zum Beispiel `formkurve`, Sichtbarkeit **Public** (GitHub Pages ist nur für öffentliche Repositories kostenlos; der Code enthält keine persönlichen Daten).
-2. `formkurve-0.7.0.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
+2. `formkurve-0.7.1.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
 3. Im Repository auf **Add file → Upload files** klicken.
 4. Im geöffneten Ordner **alles markieren** (Strg + A) und in das Upload-Feld ziehen. Nicht den Ordner selbst ziehen und nicht die ZIP-Datei.
 5. Warten, bis alle Dateien aufgelistet sind, dann unten **Commit changes**.
@@ -206,6 +206,25 @@ Jeder Wert im Dashboard hat ein (i) mit dem allgemeinen Normal- oder Richtwert, 
 
 Die Anleitung für den Kurzbefehl steht in [KURZBEFEHL.md](KURZBEFEHL.md) und in der App unter **Profil → Daten importieren**. Importe landen immer im gerade angemeldeten Konto. Vorher in der Health-App unter Profilbild → Apps → Zepp alle Kategorien freigeben.
 
+### Wenn die Tagesform leer bleibt
+
+Schlaf-Score und Strain stehen oft schon da, während Tagesform und Recovery noch „–“ zeigen. Das ist kein Importfehler, sondern Absicht:
+
+| | braucht |
+| --- | --- |
+| Schlaf-Score, Strain | nur die Nacht beziehungsweise den Tag selbst |
+| Recovery | je Nacht **HRV oder Ruhepuls** und dazu **mindestens 5 Nächte davor** zum Vergleich (ab 14 gilt der Vergleich als eingespielt) |
+| Tagesform | die Recovery dieses Tages |
+
+Recovery misst keinen absoluten Wert, sondern den Abstand zu deinen eigenen Nächten. Ohne Vergleich gibt es deshalb keine Zahl. Die App schreibt den Grund direkt unter die Tagesform-Anzeige: fehlende Nachtwerte oder zu kurzer Vergleich.
+
+**Nachsehen:** **Profil → Daten importieren → Die letzten Nächte** listet die letzten 14 Nächte mit HRV, Ruhepuls, Schlafdauer, der Zahl der Vergleichsnächte und der Recovery. Damit ist sofort sichtbar, ob ein Wert gar nicht ankommt oder nur die Geschichte fehlt.
+
+- **Eine Spalte durchgehend „fehlt“:** Der Wert kommt nicht aus Apple Health. In der Health-App unter Profilbild → Apps → **Zepp** alle Kategorien freigeben, in der Zepp-App synchronisieren und erst dann neu exportieren.
+- **Ruhepuls:** Er stammt aus dem Puls im Schlaf (10. Perzentil); ein Stern in der Tabelle heißt, dass er aus dem Feld „Ruhepuls“ von Apple Health kommt. Dafür müssen Pulswerte in der Schlafphase liegen.
+- **Nur wenige Vergleichsnächte:** Ein Apple-Health-Gesamtexport bringt die Historie auf einen Schlag mit (bis 400 Tage zurück); der Kurzbefehl liefert nur die letzten Tage.
+- **HRV landet einen Tag zu früh:** Unter **Beim Import** den HRV-Tagesversatz auf „+1 Tag“ stellen.
+
 ## Täglicher Ablauf
 
 1. Morgens: Kurzbefehl ausführen, Formkurve öffnen, auf „Heute“ **Einfügen und importieren** tippen.
@@ -233,6 +252,7 @@ Die Anleitung für den Kurzbefehl steht in [KURZBEFEHL.md](KURZBEFEHL.md) und in
 | `js/survey/supplements.js` | Supplement-Katalog, eigene Mittel, Zuordnung alter Antworten |
 | `js/survey/engine.js` | welche Fragen wann erscheinen, Vorbelegung |
 | `js/analysis/insights.js` | Einflussfaktoren (auch je Supplement), Permutationstest, Benjamini-Hochberg, Ridge |
+| `js/model/hints.js` | Hinweise des Tages und die Begründung, wenn die Tagesform fehlt |
 | `js/norms/references.js` | Normal- und Richtwerte mit Quellen für alle Infopunkte |
 | `js/context/` | Standort, Wetter, Feinstaub und Pollen von Open-Meteo |
 | `js/model/` | Formeln für Baseline, Recovery, Schlaf, Strain, Balance, Fitness, Tagesform |

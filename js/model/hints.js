@@ -54,3 +54,42 @@ export function summarize(d, settings) {
   const dir = val < 0 ? 'drückt' : 'hebt';
   return `${lead} ${COMP_LABEL[key]} ${dir} die Recovery um ${Math.abs(Math.round(val))} Punkte.`;
 }
+
+/**
+ * Warum es für einen Tag keine Tagesform gibt. Recovery braucht je Nacht HRV oder Ruhepuls
+ * und dazu genug Nächte davor als Vergleich. Gibt null zurück, wenn die Tagesform da ist.
+ */
+export function formGap(d, settings) {
+  if (!d) return { short: 'Keine Daten', title: 'Für diesen Tag gibt es keine Messwerte', text: 'Importiere die Daten dieses Tages aus Apple Health.' };
+  if (isNum(d.form)) return null;
+  const minDays = settings.model.baselineMinUsable ?? 5;
+  const hasHrv = isNum(d.hrv);
+  const hasRhr = isNum(d.rhr);
+  const baseHrv = Boolean(d.base?.lnHrv);
+  const baseRhr = Boolean(d.base?.rhr);
+  if (!hasHrv && !hasRhr) {
+    return {
+      short: 'Nachtwerte fehlen',
+      title: 'HRV und Ruhepuls fehlen für diese Nacht',
+      text: d.sleep
+        ? 'Der Schlaf ist erkannt, aber es gibt weder HRV-Werte noch Pulsmessungen in der Nacht. Prüfe in der Health-App unter Profilbild → Apps → Zepp, ob Herzfrequenz und HRV freigegeben sind, und importiere danach noch einmal.'
+        : 'Für diese Nacht gibt es keine Schlafphasen und keine Nachtwerte. Ohne getragenes Band bleibt die Tagesform leer.',
+    };
+  }
+  if (!baseHrv && !baseRhr) {
+    const n = d.baselineDays || 0;
+    return {
+      short: 'Vergleichswerte fehlen',
+      title: `Noch zu wenige Nächte zum Vergleich (${n} von ${minDays})`,
+      text: `Recovery misst ${hasHrv ? 'die HRV' : 'den Ruhepuls'} nicht absolut, sondern gegen deine eigenen Werte der Nächte davor. Ab ${minDays} Nächten rechnet die App, ab 14 gilt der Vergleich als eingespielt. Ein Apple-Health-Export mit älteren Nächten füllt das sofort auf.`,
+    };
+  }
+  // Wert und Vergleich liegen vor, passen aber nicht zusammen (etwa HRV heute, Vergleich nur beim Ruhepuls)
+  const fehlt = !hasHrv ? 'die HRV' : 'der Ruhepuls';
+  const ohne = !baseHrv ? 'die HRV' : 'den Ruhepuls';
+  return {
+    short: 'Vergleich unvollständig',
+    title: 'Recovery ließ sich für diese Nacht nicht berechnen',
+    text: `Für diese Nacht fehlt ${fehlt}, und für ${ohne} gibt es noch keine Vergleichswerte aus den Nächten davor. Mit ein paar vollständigen Nächten schließt sich die Lücke.`,
+  };
+}
