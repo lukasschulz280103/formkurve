@@ -2,7 +2,7 @@
 
 Persönliche Tagesform, Recovery, Schlaf und Strain aus den Daten deines Amazfit Helio Strap, dazu ein kurzer Morgen- und Abendcheck, ein Logbuch für Wasser, Koffein, Glück, Sport, Arbeitszeit und Tagebuch und eine Analyse, welche Gewohnheiten und Umweltfaktoren deine Werte bewegen. Eine Web-App: Jedes Konto besteht aus Name und PIN und liegt verschlüsselt auf dem Gerät. Wer will, verbindet es mit einem Online-Konto (E-Mail und Passwort) und nutzt es auf mehreren Geräten gleichzeitig; die Daten werden vorher auf dem Gerät verschlüsselt. Freunde nutzen denselben Link und legen ihr eigenes Konto an.
 
-Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.7.2.
+Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.8.1.
 
 ## Auf GitHub Pages bringen (kostenlos)
 
@@ -11,7 +11,7 @@ GitHub Pages braucht die Datei `index.html` ganz oben im Repository. Liegt sie e
 ### Erstes Hochladen (Windows)
 
 1. Auf github.com ein kostenloses Konto anlegen und ein neues Repository erstellen, Name zum Beispiel `formkurve`, Sichtbarkeit **Public** (GitHub Pages ist nur für öffentliche Repositories kostenlos; der Code enthält keine persönlichen Daten).
-2. `formkurve-0.7.2.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
+2. `formkurve-0.8.1.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
 3. Im Repository auf **Add file → Upload files** klicken.
 4. Im geöffneten Ordner **alles markieren** (Strg + A) und in das Upload-Feld ziehen. Nicht den Ordner selbst ziehen und nicht die ZIP-Datei.
 5. Warten, bis alle Dateien aufgelistet sind, dann unten **Commit changes**.
@@ -37,6 +37,7 @@ GitHub Pages braucht die Datei `index.html` ganz oben im Repository. Liegt sie e
 Ein Update ersetzt nur die App-Dateien auf GitHub. Konten, Messwerte, Antworten, Logbuch und Einstellungen liegen in der Datenbank der Web-App auf deinem Gerät; die neue Version liest sie beim Öffnen weiter.
 
 - **Formatnummer und Umwandlung:** Die Daten tragen eine Formatnummer. Braucht eine neue Version ein anderes Format, wandelt sie einmal beim Öffnen um und ergänzt dabei nur. Antworten und Messwerte werden nie umgeschrieben. Daten einer neueren Version lässt eine ältere unangetastet.
+- **Version 0.8 ergänzt nur Auswertung:** Die Frühwarnungen rechnen aus vorhandenen Tageswerten. Gespeichert werden nur die Pausen („Verstanden“) und die Einstellungen.
 - **Version 0.7 ändert nur die Oberfläche:** Der Kalender rechnet aus den vorhandenen Tageswerten; gespeichert wird nur, welcher Wert die Farben bestimmt (eine Einstellung).
 - **Version 0.6 ändert nur die Oberfläche:** Datenbank, Datenformat und Abgleich bleiben wie in 0.5. Alte Adressen wie `#daten`, `#einsichten` oder `#check` führen zur neuen Stelle.
 - **Neue Bereiche kommen dazu, nichts wird umgebaut:** Version 0.5 ergänzt in der Datenbank einen eigenen Bereich für das Logbuch. Bestehende Bereiche bleiben, wie sie sind. Ab dieser Version öffnet die App auch eine Datenbank, die eine spätere Version schon erweitert hat. Ist beim Update noch ein zweites Fenster mit der alten Version offen, meldet es „Bitte die App neu laden“.
@@ -204,7 +205,31 @@ Jeder Wert im Dashboard hat ein (i) mit dem allgemeinen Normal- oder Richtwert, 
 | Apple-Health-Export | Historie, Lücken nachholen | Health-App → Profilbild → „Alle Gesundheitsdaten exportieren“ → in Dateien sichern → in Formkurve unter **Profil → Daten importieren → Apple-Health-Export wählen** |
 | Kurzbefehl „Formkurve Sync“ | täglich | Kurzbefehl ausführen → Formkurve öffnen → auf **Heute** im Hinweis **Einfügen und importieren** (sonst **Profil → Daten importieren**) |
 
+Auf **Heute** zeigt die Karte „Belastung“ die **aktive Energie** des Tages in kcal (ohne Grundumsatz, wie Apple Health) und bei jedem Training die verbrannten kcal. Dafür muss Zepp „Aktive Energie“ an Apple Health schreiben.
+
 Die Anleitung für den Kurzbefehl steht in [KURZBEFEHL.md](KURZBEFEHL.md) und in der App unter **Profil → Daten importieren**. Importe landen immer im gerade angemeldeten Konto. Vorher in der Health-App unter Profilbild → Apps → Zepp alle Kategorien freigeben.
+
+## Frühwarnungen
+
+Auf „Heute“ erscheint eine Karte, wenn sich deine Werte über mehrere Tage von deinen eigenen entfernen. Grundlage ist das Konzeptdokument „Frühwarnsystem für Formkurve“. Abschaltbar unter **Profil → Einstellungen → Frühwarnungen**, alle Grenzen unter **Modell und Gewichte** änderbar.
+
+| Warnung | Löst aus bei | Empfehlung im Text |
+| --- | --- | --- |
+| Beginnender Infekt | Ruhepuls und Atemfrequenz über, HRV unter deiner Baseline (1,5 σ), mindestens 2 der 3 Werte, 2 Nächte nacheinander | Schonen; bei Fieber, Atemnot oder mehr als 3 bis 5 Tagen zum Hausarzt |
+| Ruhepuls dauerhaft hoch | 7-Tage-Median über 100 bpm, oder 8 bpm über der 90-Tage-Baseline über zwei Wochen | Hausarzt: Blutdruck, Schilddrüse, Blutbild |
+| Blutsauerstoff nachts niedrig | Nächtlicher Median unter 90 % in mindestens 3 von 7 Nächten | Hausarzt oder Schlafmedizin, auch wegen Schlafapnoe |
+| Schlaf chronisch kurz | Unter 6 h in mindestens 4 von 7 Nächten, und das 3 Wochen hintereinander | Schlafhygiene, danach Hausarzt |
+| Stimmung dauerhaft niedrig | Glück 4 oder weniger an mindestens 10 von 14 Tagen | Hausarzt oder psychotherapeutische Sprechstunde, dazu die Telefonseelsorge |
+
+**Die Regeln dahinter:**
+
+- **Dauer statt Ausreißer.** Keine Warnung nach einer einzigen Nacht.
+- **Störfaktoren zählen.** Alkohol im Logbuch oder ein harter Trainingstag davor machen aus der Infektwarnung eine Beobachtung („kann auch an … liegen“). Ein Krankheitsgefühl im Morgencheck hebt sie wieder an.
+- **Erst mit Verlauf.** Warnungen, die auf der Baseline beruhen, brauchen mindestens 14 Vergleichsnächte. Ohne Historie bleibt es still.
+- **Pause.** „Verstanden“ legt denselben Hinweis 7 Tage schlafen; die Pause gilt auch nach einem Neustart.
+- **Keine Diagnose.** Die Texte benennen Abweichungen und raten zur ärztlichen Abklärung. In der Karte steht fest, dass bei Brustschmerz, Atemnot oder Ohnmacht der Notruf 112 gilt.
+- **Nicht umgesetzt:** Herzrhythmusstörungen (braucht ein zertifiziertes EKG) und Fieber (braucht verlässliche Hauttemperatur).
+- In den Beispieldaten erscheinen keine Warnungen, damit erfundene Werte niemanden beunruhigen.
 
 ### Wenn die Tagesform leer bleibt
 
@@ -253,6 +278,7 @@ Recovery misst keinen absoluten Wert, sondern den Abstand zu deinen eigenen Näc
 | `js/survey/engine.js` | welche Fragen wann erscheinen, Vorbelegung |
 | `js/analysis/insights.js` | Einflussfaktoren (auch je Supplement), Permutationstest, Benjamini-Hochberg, Ridge |
 | `js/model/hints.js` | Hinweise des Tages und die Begründung, wenn die Tagesform fehlt |
+| `js/model/earlywarning.js` | Frühwarnungen: Auslöser, Störfaktoren, Pausen |
 | `js/norms/references.js` | Normal- und Richtwerte mit Quellen für alle Infopunkte |
 | `js/context/` | Standort, Wetter, Feinstaub und Pollen von Open-Meteo |
 | `js/model/` | Formeln für Baseline, Recovery, Schlaf, Strain, Balance, Fitness, Tagesform |

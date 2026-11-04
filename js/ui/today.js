@@ -9,6 +9,7 @@ import { Icon } from './icons.js';
 import { num, hours, clock, dayLabel, dateFull, signed, ago } from './format.js';
 import { addDays } from '../core/time.js';
 import { summarize, formGap } from '../model/hints.js';
+import { earlyWarnings, snoozedWarnings, snoozeWarning } from '../model/earlywarning.js';
 import { slotDone } from '../survey/engine.js';
 import { WORKOUT_LABEL } from '../data/normalize.js';
 import { formatPlace } from '../context/location.js';
@@ -179,6 +180,36 @@ function FormPeriods() {
   </section>`;
 }
 
+/**
+ * Frühwarnungen: dauerhafte Abweichungen von den eigenen Werten, nie einzelne Ausreißer.
+ * „Verstanden“ pausiert denselben Hinweis für ein paar Tage.
+ */
+function EarlyWarnings() {
+  const repo = state.repo;
+  const s = repo.settings;
+  if (!s.display.warnings) return null;
+  const list = earlyWarnings({ days: state.results.days, today: state.today, settings: s, snoozed: snoozedWarnings(repo.meta, state.today) });
+  if (!list.length) return null;
+  const ack = async (w) => {
+    await repo.patchMeta({ warnSnooze: snoozeWarning(repo.meta, w.id, state.today, s.model.warn.snoozeDays) });
+    update({ version: state.version + 1 });
+    toast(`Hinweis pausiert für ${s.model.warn.snoozeDays} Tage`);
+  };
+  return html`<section class="card warncard" aria-labelledby="h-warn">
+    <div class="card-head"><h2 id="h-warn">${list.length > 1 ? 'Frühwarnungen' : 'Frühwarnung'}</h2><span class="tiny muted">aus deinem Verlauf</span></div>
+    ${list.map((w) => html`<div class=${`hint ${w.level === 'warn' ? 'c-warn' : 'c-info'}`} key=${w.id}>
+      <${Icon} name=${w.level === 'warn' ? 'alert' : 'info'} size=${20} />
+      <div class="grow stack-s">
+        <div><b>${w.title}</b><p>${w.text}</p></div>
+        <p class="small adv"><b>${w.level === 'warn' ? 'Empfehlung:' : 'Vorschlag:'}</b> ${w.advice}</p>
+        <button type="button" class="btn small ghost" style="justify-self:start" onClick=${() => ack(w)}>Verstanden</button>
+      </div>
+    </div>`)}
+    <hr class="divider" />
+    <p class="tiny muted">Formkurve stellt keine Diagnose. Sie vergleicht nur deine Werte mit deinen eigenen Nächten davor. Bei Brustschmerz, Atemnot oder Ohnmacht gilt immer der Notruf 112.</p>
+  </section>`;
+}
+
 function SyncBanner() {
   const st = state.sync;
   if (!st?.linked || (st.state !== 'reauth' && st.state !== 'error')) return null;
@@ -286,6 +317,7 @@ export function TodayView() {
 
   const strainSub = d?.strain == null ? 'keine Pulsdaten' : d.strainPartial ? `bis ${clock(lastSample)}` : d.strengthLoad > 0 ? `inkl. Kraft +${num(d.strengthLoad)}` : `Last ${num(d.load)}`;
   const sleepSub = d?.sleep ? `${hours(d.sleep.asleepMin)} geschlafen` : 'keine Schlafdaten';
+  const wkKcal = (d?.workouts || []).reduce((s, w) => s + (w.kcal > 0 ? w.kcal : 0), 0);
   let active7 = null;
   if (d) {
     let sum = 0;
@@ -320,6 +352,7 @@ export function TodayView() {
       <${SyncBanner} />
       ${!hasAny && !state.demo ? html`<${Empty} />` : null}
       ${importReason ? html`<${ImportHint} lastSample=${lastSample} reason=${importReason} />` : null}
+      ${isToday && !state.demo ? html`<${EarlyWarnings} />` : null}
       ${gate ? html`<${MorningGate} />` : null}
       ${(gate || !hasAny) && isToday ? html`<${JournalToday} />` : null}
       ${hasAny && !gate && d ? html`
@@ -405,13 +438,16 @@ export function TodayView() {
             ${d.strengthLoad > 0 ? html`<${KV} label="davon Kraft-Zuschlag" value=${`+${num(d.strengthLoad)}`} />` : null}
             ${active7 != null ? html`<${KV} label="Aktivminuten (7 Tage)" value=${num(active7)} k="activeMin" infoValue=${active7} />` : null}
             ${d.acwr != null ? html`<${KV} label="7 zu 28 Tage" value=${num(d.acwr, 2)} k="acwr" infoValue=${d.acwr} />` : null}
+            ${d.energy != null ? html`<${KV} label=${d.strainPartial ? 'Aktive Energie bisher' : 'Aktive Energie'} value=${`${num(d.energy)} kcal`} />` : null}
+            ${wkKcal > 0 ? html`<${KV} label="davon im Training" value=${`${num(wkKcal)} kcal`} />` : null}
             ${d.steps != null ? html`<${KV} label="Schritte" value=${num(d.steps)} k="steps" infoValue=${d.steps} />` : null}
             ${vo2 != null ? html`<${KV} label="VO₂max (Schätzung)" value=${html`${num(vo2, 1)}${vo2Date !== date ? html` <span class="tiny muted">· ${dayLabel(vo2Date, state.today)}</span>` : null}`} k="vo2" infoValue=${vo2} />` : null}
             ${d.fitness != null ? html`<${KV} label="Langzeit-Fitness" value=${num(d.fitness)} k="fitness" infoValue=${d.fitness} />` : null}
           </dl>
           ${d.workouts?.length ? html`<hr class="divider" />${d.workouts.map((w) => html`<div class="row between small" style="padding:4px 0">
             <span><b>${WORKOUT_LABEL[w.kind] || 'Training'}</b> <span class="muted">${clock(w.t)} · ${num(w.durMin)} min</span></span>
-            <span class="muted tnum">${w.avgHr ? `Ø ${num(w.avgHr)} bpm` : ''}</span></div>`)}` : null}
+            <span class="muted tnum">${[w.kcal > 0 ? `${num(w.kcal)} kcal` : '', w.avgHr ? `Ø ${num(w.avgHr)} bpm` : ''].filter(Boolean).join(' · ')}</span></div>`)}` : null}
+          ${d.energy != null ? html`<p class="tiny muted" style="margin-top:8px">Aktive Energie ohne Grundumsatz, so wie Apple Health sie zählt.</p>` : null}
           ${d.load == null && !d.workouts?.length ? html`<p class="small muted">Keine Pulsdaten für diesen Tag.</p>` : null}
         </section>
         <${Environment} date=${date} />

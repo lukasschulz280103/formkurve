@@ -276,6 +276,7 @@ export function generateDemo({ days = 90, endDate = todayKey(), seed = 11, nowMs
       }
       const act = { kraft: 'TraditionalStrengthTraining', ausdauer: tr.dur > 60 ? 'Running' : 'Running', hiit: 'HighIntensityIntervalTraining', team: 'Soccer', mobility: 'Yoga' }[tr.kind];
       workouts.push({ t: trainStart, e: trainEnd, act, kind: tr.kind, durMin: tr.dur, avgHr: Math.round(hrs.reduce((s, x) => s + x, 0) / hrs.length), maxHr: Math.max(...hrs), kcal: Math.round(tr.dur * 8.5), src: ZEPP });
+      push('energy', trainStart, trainEnd, Math.round(tr.dur * 8.5));
     }
     const strength = tr?.kind === 'kraft' ? tr.dur * tr.rpe * 0.4 : 0;
     loadOf.set(d, trimp + strength);
@@ -289,6 +290,7 @@ export function generateDemo({ days = 90, endDate = todayKey(), seed = 11, nowMs
       const v = Math.max(0, Math.round(N(share, share * 0.5)));
       push('steps', at(d, h * 60), at(d, h * 60 + 59), v);
       push('steps', at(d, h * 60), at(d, h * 60 + 59), Math.round(v * 0.82), PHONE);
+      push('energy', at(d, h * 60), at(d, h * 60 + 59), Math.round(v * 0.04 + 6));
     }
     if (weekday(d) === 0) push('vo2', at(d, 9 * 60), at(d, 9 * 60), Math.round((44 + 2 * progress + N(0, 0.4)) * 10) / 10);
   }

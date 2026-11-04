@@ -1000,3 +1000,8 @@ button.card { -webkit-appearance: none; appearance: none; width: 100%; font: inh
 .scale-load .lv2 { background: color-mix(in srgb, var(--strain) 42%, var(--surface)); color: var(--ink); }
 .scale-load .lv3 { background: color-mix(in srgb, var(--strain) 58%, var(--surface)); color: var(--ink); }
 .scale-load .lv4 { background: color-mix(in srgb, var(--strain) 76%, var(--surface)); color: var(--ink); }
+
+/* Frühwarnungen */
+.warncard { border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); }
+.warncard .hint p { margin-top: 2px; }
+.warncard .adv b { display: inline; }

@@ -14,6 +14,7 @@ export const DEFAULTS = {
   display: {
     theme: 'auto', // auto | dark | light
     hideScoresUntilMorning: true,
+    warnings: true, // Frühwarnungen auf „Heute“
     profileHintDismissed: false,
     formPeriod: 'week', // Tagesform im Schnitt auf „Heute“: week | month
     calendarMetric: 'form', // Wert, nach dem der Monatskalender die Tage einfärbt
@@ -45,6 +46,23 @@ export const DEFAULTS = {
       zoneEdges: [0.5, 0.6, 0.7, 0.8, 0.9],
     },
     balance: { lo: 0.8, hi: 1.3, minDays: 14 },
+    // Frühwarnungen: Startwerte aus dem Konzept, alle einstellbar
+    warn: {
+      z: 1.5, // Abweichung von der eigenen Baseline, ab der ein Nachtwert auffällt
+      nights: 2, // so viele Nächte nacheinander
+      minBaselineDays: 14, // ohne so viele Nächte Verlauf keine Baseline-Warnung
+      hardStrain: 70, // ab diesem Strain gilt der Vortag als harter Trainingstag
+      rhrAbs: 100, // 7-Tage-Median des Ruhepulses darüber
+      rhrRise: 8, // bpm über der 90-Tage-Baseline, zwei Wochen lang
+      spo2Min: 90, // nächtlicher Median darunter
+      spo2Nights: 3, // in so vielen der letzten 7 Nächte
+      sleepH: 6, // Nächte unter so vielen Stunden
+      sleepNights: 4, // in so vielen von 7 Nächten
+      sleepWeeks: 3, // über so viele Wochen
+      moodMax: 4, // Glück bis hierhin gilt als niedrig
+      moodDays: 10, // an so vielen von 14 Tagen
+      snoozeDays: 7, // Pause, nachdem eine Warnung quittiert wurde
+    },
     fitness: {
       halfLife: 42,
       rhrBest: 42, rhrWorst: 78,
@@ -88,6 +106,14 @@ export const PARAMS = [
   { group: 'Recovery', path: 'model.recovery.spread', label: 'Spreizfaktor', min: 0.5, max: 3, step: 0.1 },
   { group: 'Recovery', path: 'model.recovery.red', label: 'Grenze rot unter', min: 10, max: 50, step: 1 },
   { group: 'Recovery', path: 'model.recovery.green', label: 'Grenze grün ab', min: 50, max: 90, step: 1 },
+  { group: 'Frühwarnung', path: 'model.warn.z', label: 'Abweichung für Infektwarnung (σ)', min: 0.5, max: 3, step: 0.1 },
+  { group: 'Frühwarnung', path: 'model.warn.nights', label: 'Nächte nacheinander', min: 1, max: 5, step: 1 },
+  { group: 'Frühwarnung', path: 'model.warn.rhrAbs', label: 'Ruhepuls-Wochenmedian über (bpm)', min: 70, max: 130, step: 1 },
+  { group: 'Frühwarnung', path: 'model.warn.rhrRise', label: 'Anstieg über die 90-Tage-Baseline (bpm)', min: 3, max: 20, step: 1 },
+  { group: 'Frühwarnung', path: 'model.warn.spo2Min', label: 'Blutsauerstoff nachts unter (%)', min: 80, max: 95, step: 1 },
+  { group: 'Frühwarnung', path: 'model.warn.sleepH', label: 'Kurze Nacht unter (h)', min: 4, max: 8, step: 0.5 },
+  { group: 'Frühwarnung', path: 'model.warn.moodMax', label: 'Glück gilt als niedrig bis', min: 0, max: 8, step: 1 },
+  { group: 'Frühwarnung', path: 'model.warn.snoozeDays', label: 'Pause nach „Verstanden“ (Tage)', min: 1, max: 30, step: 1 },
   { group: 'Schlaf', path: 'model.sleep.wDuration', label: 'Gewicht Dauer', min: 0, max: 1, step: 0.05 },
   { group: 'Schlaf', path: 'model.sleep.wEfficiency', label: 'Gewicht Effizienz', min: 0, max: 1, step: 0.05 },
   { group: 'Schlaf', path: 'model.sleep.wStages', label: 'Gewicht Tief + REM', min: 0, max: 1, step: 0.05 },

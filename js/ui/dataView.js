@@ -294,6 +294,8 @@ function Preferences() {
         <div style="grid-column:1 / -1"><${Segmented} label="Erscheinungsbild" value=${s.display.theme} onChange=${(v) => set('display.theme', v)} options=${[{ value: 'auto', label: 'Auto' }, { value: 'dark', label: 'Dunkel' }, { value: 'light', label: 'Hell' }]} /></div></div>
       <div class="list-row"><span class="t">Scores erst nach dem Morgencheck</span><${Switch} id="gate" label="Scores erst nach dem Morgencheck" checked=${s.display.hideScoresUntilMorning} onChange=${(v) => set('display.hideScoresUntilMorning', v)} />
         <span class="d">Verhindert, dass die Zahl dein Gefühl beeinflusst.</span></div>
+      <div class="list-row"><span class="t">Frühwarnungen auf „Heute“</span><${Switch} id="warn" label="Frühwarnungen" checked=${s.display.warnings} onChange=${(v) => set('display.warnings', v)} />
+        <span class="d">Meldet dauerhafte Abweichungen bei Ruhepuls, HRV, Atemfrequenz, Blutsauerstoff, Schlafdauer und Stimmung. Grenzen unter „Modell und Gewichte“.</span></div>
       <div class="list-row"><span class="t">Nikotin und Cannabis abfragen</span><${Switch} id="nic" label="Nikotin und Cannabis abfragen" checked=${s.survey.askNicotine} onChange=${(v) => set('survey.askNicotine', v)} /></div>
       <div class="list-row"><span class="t">Sensible Fragen</span><${Switch} id="sens" label="Sensible Fragen" checked=${s.survey.sensitive} onChange=${(v) => set('survey.sensitive', v)} />
         <span class="d">Zum Beispiel Intimität. Bleibt nur auf deinem Gerät.</span></div>

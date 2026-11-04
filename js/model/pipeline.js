@@ -68,6 +68,8 @@ function nightly(index, date, sleep, settings) {
   const spo2 = index.window('spo2', from, to).v;
   if (spo2.length) {
     out.spo2 = mean(spo2);
+    // Median für die Frühwarnung: robuster gegen einzelne Fehlmessungen als der Mittelwert
+    out.spo2Med = median(spo2);
     out.spo2Min = Math.min(...spo2);
   }
   const resp = index.window('resp', from, to).v;

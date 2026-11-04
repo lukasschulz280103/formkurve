@@ -16,6 +16,7 @@ Der Kurzbefehl liest die Werte der letzten zwei Tage aus Apple Health und kopier
    - Atemfrequenz
    - Blutsauerstoff
    - Schritte
+   - Aktive Energie
    - Schlafanalyse
 5. Aktion **Wiederholen mit jedem Objekt** anfügen, Eingabe: Variable `Proben`.
 6. In die Wiederholung eine **Text**-Aktion legen. Darin sechs Eigenschaften der Variable **Wiederholungsobjekt** einsetzen, getrennt durch Semikolon:
