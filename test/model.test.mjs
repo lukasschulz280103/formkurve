@@ -60,8 +60,8 @@ test('Schlafbedarf und Schlaf-Score', () => {
   const need = sleepNeed({ base: 8, strainPrev: 80, debtsH: [1, 0, 2], napMinPrev: 30 }, M.sleep);
   near(need, 8 + 0.4 + 0.75 - 0.5, 1e-9);
   const capped = sleepNeed({ base: 8, strainPrev: 100, debtsH: [4, 4, 4], napMinPrev: 0 }, M.sleep);
-  near(capped, 9.5, 1e-9);
-  const s = sleepScore({ asleepMin: 480, needH: 8, efficiency: 0.95, restorativePct: 0.45, regularity: 100 }, M.sleep);
+  near(capped, 10.5, 1e-9);
+  const s = sleepScore({ asleepMin: 480, needH: 8, efficiency: 0.95, restorativePct: 0.45, regularity: 100, calm: 100 }, M.sleep);
   near(s.score, 100, 1e-9);
   const short = sleepScore({ asleepMin: 360, needH: 8, efficiency: 0.85, restorativePct: 0.3, regularity: null }, M.sleep);
   assert.ok(short.score > 50 && short.score < 75, `kurz: ${short.score}`);

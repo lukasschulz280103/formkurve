@@ -8,6 +8,7 @@ import { Icon } from './icons.js';
 import { InfoButton } from './info.js';
 import { num } from './format.js';
 import { ageOf } from '../core/config.js';
+import { isNum } from '../core/stats.js';
 
 const lastOf = (arr) => {
   for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return arr[i];
@@ -68,6 +69,18 @@ export function TrendsView() {
   const warmNights = nightT.some((x) => x != null && x >= 14);
   const pm25 = pick((d) => d.context?.pm25);
   const spo2 = pick((d) => d.spo2);
+  // Gewicht wird selten gemessen: die letzte Messung gilt bis zur nächsten, längstens 21 Tage
+  let lastMass = null;
+  let massAge = 0;
+  const mass = pick((d) => {
+    if (isNum(d.mass)) {
+      lastMass = d.mass;
+      massAge = 0;
+      return d.mass;
+    }
+    massAge++;
+    return lastMass != null && massAge <= 21 ? lastMass : null;
+  });
   const f0 = (v) => num(v);
   const f1 = (v) => num(v, 1);
   const f2 = (v) => num(v, 2);
@@ -133,6 +146,10 @@ export function TrendsView() {
         table=${{ dates, columns: [{ label: 'Schritte', values: steps, fmt: f0 }] }}>
         <${TimeChart} label="Schritte je Tag" dates=${dates} yTicks=${null} refLines=${[{ y: (ageOf(settings) ?? 0) >= 60 ? 6000 : 8000 }]}
           series=${[{ key: 'steps', label: 'Schritte', values: steps, type: 'bar', color: 'var(--ink-2)' }]} fmt=${(v) => (v >= 1000 ? `${num(v / 1000, 1)} T` : num(v))} tickFmt=${(v) => (v >= 1000 ? `${num(v / 1000)} T` : num(v))} yDomain=${[0, Math.max(10000, ...steps.filter((x) => x != null)) * 1.05]} />
+      <//>` : null}
+      ${has(mass) ? html`<${ChartCard} id="mass" title="Gewicht" sub="Jede Messung gilt bis zur nächsten"
+        table=${{ dates, columns: [{ label: 'Gewicht kg', values: mass, fmt: f1 }] }}>
+        <${TimeChart} label="Gewicht über die Zeit" dates=${dates} series=${[{ key: 'mass', label: 'Gewicht', values: mass, color: 'var(--ink)' }]} fmt=${f1} tickFmt=${f1} />
       <//>` : null}
       ${has(nightT) ? html`<${ChartCard} id="nightT" info=${{ k: 'nightTemp', value: lastOf(nightT) }} title="Nachttemperatur" sub=${warmNights ? 'Tiefstwert draußen; Linie = Tropennacht (20 °C)' : 'Tiefstwert draußen in der Nacht'}
         table=${{ dates, columns: [{ label: 'Nacht °C', values: nightT, fmt: f1 }] }}>

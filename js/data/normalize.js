@@ -111,7 +111,8 @@ export function sleepCode(value) {
   return SLEEP.ASLEEP;
 }
 
-const LIMITS = {
+/** Plausibler Messbereich je Typ. Werte außerhalb sind Messfehler und werden verworfen. */
+export const LIMITS = {
   hr: [30, 230],
   rhr: [30, 150],
   hrv: [5, 300],
@@ -125,11 +126,17 @@ const LIMITS = {
   energy: [0, 10000],
 };
 
-/** Normalisiert Einheiten und prüft Plausibilität. Gibt NaN für unbrauchbare Werte zurück. */
-export function normalizeValue(type, value, unit = '') {
+/**
+ * Normalisiert Einheiten und prüft Plausibilität. Gibt NaN für unbrauchbare Werte zurück.
+ * `info` nimmt, wenn übergeben, den Grund auf: 'nan' (keine Zahl) oder 'range' (außerhalb des Messbereichs).
+ */
+export function normalizeValue(type, value, unit = '', info = null) {
   if (type === 'sleep') return sleepCode(value);
   let v = parseNumber(value, type);
-  if (!Number.isFinite(v)) return NaN;
+  if (!Number.isFinite(v)) {
+    if (info) info.reason = 'nan';
+    return NaN;
+  }
   const u = String(unit || '').toLowerCase();
   if (type === 'spo2' && v <= 1.0001) v *= 100;
   if ((type === 'wtemp' || type === 'btemp') && /f/.test(u) && !/c/.test(u)) v = ((v - 32) * 5) / 9;
@@ -137,7 +144,10 @@ export function normalizeValue(type, value, unit = '') {
   if (type === 'energy' && /kj/.test(u)) v /= 4.184;
   if (type === 'hrv' && /^s$|sec/.test(u) && v < 2) v *= 1000;
   const lim = LIMITS[type];
-  if (lim && (v < lim[0] || v > lim[1])) return NaN;
+  if (lim && (v < lim[0] || v > lim[1])) {
+    if (info) info.reason = 'range';
+    return NaN;
+  }
   return v;
 }
 

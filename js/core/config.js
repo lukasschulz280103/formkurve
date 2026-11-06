@@ -13,8 +13,11 @@ export const DEFAULTS = {
   },
   display: {
     theme: 'auto', // auto | dark | light
+    palette: 'rot', // Farbvariante: rot (Weiß und Rottöne) | schiefer (ruhiges Nacht-Blau)
+    cards: {}, // Karten auf „Heute“, die ausgeblendet sind: { [id]: false }
     hideScoresUntilMorning: true,
     warnings: true, // Frühwarnungen auf „Heute“
+    dataCheck: true, // Meldung auf „Heute“, wenn Messwerte fehlen
     profileHintDismissed: false,
     formPeriod: 'week', // Tagesform im Schnitt auf „Heute“: week | month
     calendarMetric: 'form', // Wert, nach dem der Monatskalender die Tage einfärbt
@@ -34,11 +37,14 @@ export const DEFAULTS = {
       red: 34, green: 67,
     },
     sleep: {
-      wDuration: 0.4, wEfficiency: 0.2, wStages: 0.2, wRegularity: 0.2,
+      wDuration: 0.35, wEfficiency: 0.18, wStages: 0.17, wRegularity: 0.15,
       effLow: 0.7, effHigh: 0.92, stageLow: 0.15, stageHigh: 0.4,
       regGood: 20, regBad: 120,
-      strainNeedFrom: 40, strainNeedPerPoint: 0.01,
-      debtFactor: 0.25, extraCap: 1.5, napCap: 1.0,
+      wCalm: 0.15,
+      calmLow: -1.5, calmHigh: 1.0,
+      strainNeedFrom: 40, strainNeedPerPoint: 0.01, strainPrev2Weight: 0.5,
+      recNeedFrom: 55, recNeedPerPoint: 0.012, recNights: 2,
+      debtFactor: 0.25, extraCap: 2.5, napCap: 1.0,
       sessionGapMin: 90, minSleepH: 4,
     },
     strain: {
@@ -71,7 +77,19 @@ export const DEFAULTS = {
       vo2Low: 30, vo2High: 60,
       wRhr: 0.3, wHrv: 0.2, wActive: 0.3, wRegular: 0.1, wVo2: 0.1,
     },
-    form: { wR: 0.45, wS: 0.25, wB: 0.15, wF: 0.15, lag0: 0.5, lag1: 0.3, lag2: 0.2 },
+    form: {
+      wR: 0.45, wS: 0.25, wB: 0.15, wF: 0.15, lag0: 0.5, lag1: 0.3, lag2: 0.2,
+      // Zuschlag aus dem Logbuch, in Punkten der Tagesform. Klein und gedeckelt, weil
+      // Alkohol, Koffein und Wasser zum Teil schon in HRV, Puls und Schlaf stecken.
+      lifestyle: {
+        on: true,
+        alcohol: 3, alcoholPerDrink: 1, alcoholCap: 5,
+        water: 2, waterFrac: 0.6, waterGood: 0.9,
+        caffeineHigh: 1, highMg: 400,
+        caffeineLate: 2, lateHour: 17,
+        bonus: 1, cap: 6,
+      },
+    },
   },
   survey: {
     depth: 'standard', // kurz: nur Kernfragen | standard: dazu die 3 wichtigsten optionalen | ausfuehrlich: alle
@@ -118,6 +136,11 @@ export const PARAMS = [
   { group: 'Schlaf', path: 'model.sleep.wEfficiency', label: 'Gewicht Effizienz', min: 0, max: 1, step: 0.05 },
   { group: 'Schlaf', path: 'model.sleep.wStages', label: 'Gewicht Tief + REM', min: 0, max: 1, step: 0.05 },
   { group: 'Schlaf', path: 'model.sleep.wRegularity', label: 'Gewicht Regelmäßigkeit', min: 0, max: 1, step: 0.05 },
+  { group: 'Schlaf', path: 'model.sleep.wCalm', label: 'Gewicht nächtliche Ruhe', min: 0, max: 1, step: 0.05 },
+  { group: 'Schlaf', path: 'model.sleep.recNeedFrom', label: 'Mehrbedarf ab Recovery unter', min: 0, max: 100, step: 5 },
+  { group: 'Schlaf', path: 'model.sleep.recNeedPerPoint', label: 'Mehrbedarf je Recovery-Punkt (h)', min: 0, max: 0.05, step: 0.002 },
+  { group: 'Schlaf', path: 'model.sleep.debtFactor', label: 'Anteil der Schlafschuld', min: 0, max: 1, step: 0.05 },
+  { group: 'Schlaf', path: 'model.sleep.extraCap', label: 'Mehrbedarf höchstens (h)', min: 0, max: 4, step: 0.25 },
   { group: 'Strain', path: 'model.strain.k', label: 'Teiler (Skalierung)', min: 100, max: 500, step: 10 },
   { group: 'Strain', path: 'model.strain.strengthFactor', label: 'Kraft-Zuschlag je Minute × RPE', min: 0, max: 1.5, step: 0.05 },
   { group: 'Strain', path: 'model.strain.defaultRpe', label: 'RPE, wenn nicht angegeben', min: 1, max: 10, step: 1 },
@@ -125,6 +148,10 @@ export const PARAMS = [
   { group: 'Tagesform', path: 'model.form.wS', label: 'Gewicht Schlaf', min: 0, max: 1, step: 0.05 },
   { group: 'Tagesform', path: 'model.form.wB', label: 'Gewicht Belastungsbalance', min: 0, max: 1, step: 0.05 },
   { group: 'Tagesform', path: 'model.form.wF', label: 'Gewicht Langzeit-Fitness', min: 0, max: 1, step: 0.05 },
+  { group: 'Tagesform', path: 'model.form.lifestyle.alcohol', label: 'Abzug für Alkohol', min: 0, max: 10, step: 1 },
+  { group: 'Tagesform', path: 'model.form.lifestyle.caffeineLate', label: 'Abzug für spätes Koffein', min: 0, max: 10, step: 1 },
+  { group: 'Tagesform', path: 'model.form.lifestyle.water', label: 'Abzug für wenig Wasser', min: 0, max: 10, step: 1 },
+  { group: 'Tagesform', path: 'model.form.lifestyle.cap', label: 'Logbuch-Abzug höchstens', min: 0, max: 20, step: 1 },
   { group: 'Langzeit-Fitness', path: 'model.fitness.halfLife', label: 'Halbwertszeit (Tage)', min: 14, max: 120, step: 1 },
   { group: 'Langzeit-Fitness', path: 'model.fitness.activeTarget', label: 'Ziel Aktivminuten pro Woche', min: 60, max: 600, step: 10 },
   { group: 'Baseline', path: 'model.baselineWindow', label: 'Fenster (Tage)', min: 14, max: 60, step: 1 },

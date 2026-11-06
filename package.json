@@ -5,7 +5,8 @@
   "scripts": {
     "test": "TZ=Europe/Berlin node --test test/*.test.mjs",
     "build": "node tools/build.mjs",
-    "serve": "node tools/serve.mjs"
+    "serve": "node tools/serve.mjs",
+    "build:design": "node tools/build-design.mjs"
   },
   "keywords": [],
   "author": "",

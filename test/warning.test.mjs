@@ -75,7 +75,8 @@ test('Infektwarnung: Alkohol oder hartes Training machen daraus eine Beobachtung
     [addDays(TODAY, -1)]: krank,
     [addDays(TODAY, -2)]: { strain: 85 },
   });
-  assert.match(find(mitTraining)[0].text, /hartes Training/);
+  assert.match(find(mitTraining)[0].text, /hartem Training am Tag davor/);
+  assert.match(find(mitTraining)[0].text, /Strain 85 am Vortag/);
   // Mit Krankheitsgefühl bleibt es trotz Alkohol eine Warnung
   const trotzdem = build(40, {}, {
     [TODAY]: { ...krank, answers: { M10: ['fieber'] } },

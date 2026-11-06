@@ -238,6 +238,8 @@ export function generateDemo({ days = 90, endDate = todayKey(), seed = 11, nowMs
     }
     for (let tt = onset + 20 * MIN; tt < wake; tt += 30 * MIN) push('spo2', tt, tt, clamp(Math.round(N(spo2, 0.8) * 10) / 10, 88, 100));
     push('resp', onset + 3 * HOUR, onset + 3 * HOUR, Math.round(resp * 10) / 10);
+    // Hauttemperatur im Schlaf: leicht erhöht, wenn der Körper mit etwas kämpft
+    push('wtemp', onset + 4 * HOUR, onset + 4 * HOUR, Math.round((33.6 + (sick ? 0.5 : 0) + N(0, 0.12)) * 100) / 100);
     nightInfo.set(d, { rhr, lnHrv, bed, onset, wake: nightEnd, latencyMin: lat / MIN, drinksBefore: b.drinks, sick, deepDelta, extraWakes });
 
     // Tagesaktivität am Tag d (bis zum nächsten Zubettgehen)
@@ -293,6 +295,8 @@ export function generateDemo({ days = 90, endDate = todayKey(), seed = 11, nowMs
       push('energy', at(d, h * 60), at(d, h * 60 + 59), Math.round(v * 0.04 + 6));
     }
     if (weekday(d) === 0) push('vo2', at(d, 9 * 60), at(d, 9 * 60), Math.round((44 + 2 * progress + N(0, 0.4)) * 10) / 10);
+    // Gewicht: morgens auf der Waage, leicht fallend über den Zeitraum
+    if (weekday(d) === 1) push('mass', at(d, 7 * 60 + 10), at(d, 7 * 60 + 10), Math.round((79.5 - 1.5 * progress + N(0, 0.35)) * 10) / 10, 'Waage');
   }
 
   // Umfrage

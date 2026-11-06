@@ -2,7 +2,7 @@
 
 Persönliche Tagesform, Recovery, Schlaf und Strain aus den Daten deines Amazfit Helio Strap, dazu ein kurzer Morgen- und Abendcheck, ein Logbuch für Wasser, Koffein, Glück, Sport, Arbeitszeit und Tagebuch und eine Analyse, welche Gewohnheiten und Umweltfaktoren deine Werte bewegen. Eine Web-App: Jedes Konto besteht aus Name und PIN und liegt verschlüsselt auf dem Gerät. Wer will, verbindet es mit einem Online-Konto (E-Mail und Passwort) und nutzt es auf mehreren Geräten gleichzeitig; die Daten werden vorher auf dem Gerät verschlüsselt. Freunde nutzen denselben Link und legen ihr eigenes Konto an.
 
-Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.8.1.
+Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.9.0.
 
 ## Auf GitHub Pages bringen (kostenlos)
 
@@ -11,7 +11,7 @@ GitHub Pages braucht die Datei `index.html` ganz oben im Repository. Liegt sie e
 ### Erstes Hochladen (Windows)
 
 1. Auf github.com ein kostenloses Konto anlegen und ein neues Repository erstellen, Name zum Beispiel `formkurve`, Sichtbarkeit **Public** (GitHub Pages ist nur für öffentliche Repositories kostenlos; der Code enthält keine persönlichen Daten).
-2. `formkurve-0.8.1.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
+2. `formkurve-0.9.0.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
 3. Im Repository auf **Add file → Upload files** klicken.
 4. Im geöffneten Ordner **alles markieren** (Strg + A) und in das Upload-Feld ziehen. Nicht den Ordner selbst ziehen und nicht die ZIP-Datei.
 5. Warten, bis alle Dateien aufgelistet sind, dann unten **Commit changes**.
@@ -134,6 +134,21 @@ Unten stehen vier Reiter: **Heute**, **Logbuch**, **Verlauf** und **Profil**.
 - **Täglicher Import ohne Umweg:** Fehlt auf „Heute“ die letzte Nacht oder sind die Daten älter als 20 Stunden, steht oben ein Hinweis mit **Einfügen und importieren**.
 - **Tag oder Monat:** Über dem Titel auf „Heute“ steht ein Umschalter. Siehe den nächsten Abschnitt.
 
+## Farben und Karten
+
+**Profil → Einstellungen → Farben:** zwei Varianten, unabhängig von hell und dunkel.
+
+| Variante | Sieht aus wie |
+| --- | --- |
+| **Rot** (Standard) | Weiß mit Rottönen, Zeiger und Knöpfe in Rot – der Entwurf im Stil von Apple Health |
+| **Schiefer** | das ruhige Nachtblau der ersten Versionen |
+
+Semantische Farben bleiben in beiden Varianten gleich: Grün heißt gut, Gelb Vorsicht, Rot kritisch.
+
+**Profil → Einstellungen → Karten auf „Heute“:** acht Karten lassen sich einzeln abschalten – Ringe, Tagesform im Schnitt, Was deine Recovery bewegt, Hinweise, Letzte Nacht, Schlaf, Belastung und Umwelt. Die Tagesform selbst und die Karten für Import, Check-in und Frühwarnungen bleiben immer.
+
+Karten, für die gar keine Messwerte ankommen, erkennt die App aus der Datenprüfung und bietet sie oben in der Liste zum Ausblenden an („Diese ausblenden“ schaltet alle auf einmal ab). Steht eine solche Karte leer auf „Heute“, steht neben dem Hinweis direkt ein **Karte ausblenden**. Kommt der Wert später doch, schaltest du sie in den Einstellungen wieder ein.
+
 ## Der Monatskalender
 
 **Heute → Monat** zeigt den ganzen Monat als Raster von Montag bis Sonntag. Jeder Tag bekommt eine Farbe nach seinem Wert, wie eine Farbskala bei bedingter Formatierung in einer Tabelle. So fallen gute und schlechte Strecken sofort auf, und ein Tippen auf einen Tag öffnet ihn in der Tagesansicht.
@@ -231,6 +246,34 @@ Auf „Heute“ erscheint eine Karte, wenn sich deine Werte über mehrere Tage v
 - **Nicht umgesetzt:** Herzrhythmusstörungen (braucht ein zertifiziertes EKG) und Fieber (braucht verlässliche Hauttemperatur).
 - In den Beispieldaten erscheinen keine Warnungen, damit erfundene Werte niemanden beunruhigen.
 
+## Datenprüfung: was fehlt und was deshalb nicht geht
+
+**Profil → Daten importieren → Datenprüfung** listet jeden Messwert mit seinem Zustand und, wenn er fehlt, mit der Folge. Vier Zustände:
+
+| Zustand | Heißt |
+| --- | --- |
+| Zahl und Zeitraum | kommt an und ist aktuell |
+| „keine neuen Werte seit …“ | kam früher, fehlt aber seit mehr als 3 Tagen |
+| „fehlt“ | nie angekommen, und es kostet eine Berechnung |
+| „kommt an, ließ sich aber nicht lesen“ | Werte waren da, lagen aber außerhalb des Messbereichs oder hatten kein lesbares Datum oder keine Zahl |
+
+Darunter steht, welche Berechnungen gerade nicht laufen und was ihnen fehlt, und getrennt davon, was nur noch auf Verlauf wartet (Recovery und Tagesform brauchen erst Vergleichsnächte). Verworfene Werte nennt die App mit Grund und Messbereich, etwa „40 außerhalb des Messbereichs (70–100 %)“; unbekannte Typen aus dem Kurzbefehl stehen mit Namen da.
+
+Ein fehlender Wert ist nicht immer ein Fehler: Hauttemperatur, Körpertemperatur und Apples eigener Ruhepuls fehlen bei vielen Geräten, ohne dass etwas ausfällt. Solche Zeilen bleiben grau und lösen keine Meldung aus.
+
+**Auf „Heute“** erscheint eine Meldung nur, wenn ein fehlender Wert wirklich eine Berechnung kostet; sie nennt die betroffenen Berechnungen und führt zur Prüfung. „Ausblenden“ merkt sich den Zustand, bis er sich ändert — fällt später ein weiterer Wert aus, meldet sie sich wieder. Ganz abschaltbar unter **Profil → Einstellungen → Hinweis bei fehlenden Messwerten**.
+
+Die wichtigsten Abhängigkeiten:
+
+| Fehlt | Dann fehlt |
+| --- | --- |
+| Herzfrequenz | Strain und Last, Aktivminuten, Belastungsbalance, Ruhepuls aus dem Schlaf |
+| Schlafanalyse | Schlaf-Score, Schlafbedarf, Tiefschlaf und REM — und das Nachtfenster, also auch der Ruhepuls |
+| HRV | der HRV-Anteil der Recovery; zusammen mit fehlendem Nachtpuls auch Recovery und Tagesform |
+| Atemfrequenz, Blutsauerstoff, Hauttemperatur | je ein Teil des Vitalanteils; fehlen alle drei, fällt er ganz weg |
+| Blutsauerstoff | die Frühwarnung „Blutsauerstoff niedrig“ |
+| Schritte, Aktive Energie, VO₂max, Gewicht | nur die jeweilige Anzeige |
+
 ### Wenn die Tagesform leer bleibt
 
 Schlaf-Score und Strain stehen oft schon da, während Tagesform und Recovery noch „–“ zeigen. Das ist kein Importfehler, sondern Absicht:
@@ -249,6 +292,67 @@ Recovery misst keinen absoluten Wert, sondern den Abstand zu deinen eigenen Näc
 - **Ruhepuls:** Er stammt aus dem Puls im Schlaf (10. Perzentil); ein Stern in der Tabelle heißt, dass er aus dem Feld „Ruhepuls“ von Apple Health kommt. Dafür müssen Pulswerte in der Schlafphase liegen.
 - **Nur wenige Vergleichsnächte:** Ein Apple-Health-Gesamtexport bringt die Historie auf einen Schlag mit (bis 400 Tage zurück); der Kurzbefehl liefert nur die letzten Tage.
 - **HRV landet einen Tag zu früh:** Die Zeile unter der Tabelle sagt es. Dann unter **Beim Import** den HRV-Tagesversatz auf „+1 Tag“ stellen. Die Prüfung liest die Rohdaten und gilt unabhängig davon, wie der Schalter gerade steht.
+
+## Wie Schlaf, Erholung und Logbuch zusammenhängen
+
+### Schlafbedarf
+
+Der Bedarf ist keine feste Zahl, sondern wächst mit dem, was hinter dir liegt:
+
+| Teil | Wirkung |
+| --- | --- |
+| Grundbedarf | aus den Körperdaten, Standard 8,0 h |
+| Schlafschuld der letzten drei Nächte | 25 % des Fehlbetrags |
+| Belastung | Strain über 40 am Vortag (voll) und am Tag davor (zur Hälfte) |
+| Schwache Erholung | Recovery der letzten zwei Nächte unter 55, je Punkt 0,012 h |
+| Mittagsschlaf | zieht bis zu 1 h ab |
+
+Der Mehrbedarf ist zusammen auf 2,5 h gedeckelt. Zwei Nächte Party mit wenig Schlaf, hohem Strain und schwacher Erholung heben ihn also deutlich – in der Schlafkarte steht die Rechnung aufgeschlüsselt: „Bedarf 9:45 h = 8:00 h Grundbedarf + 1,0 h Schlafschuld + 0,5 h für die Belastung davor + 0,3 h für die schwache Erholung“.
+
+### Warum Schlaf-Score und Recovery auseinanderlaufen können
+
+Der Schlaf-Score bewertet den **Schlaf**, die Recovery den **Zustand am Morgen**. Lange und durchgehend zu schlafen heißt nicht, dass die Nacht erholsam war. Damit der Score das nicht übersieht, zählt seit Version 0.9 ein fünfter Anteil mit:
+
+| Anteil | Gewicht | Woraus |
+| --- | --- | --- |
+| Dauer | 0,35 | geschlafene Zeit gegen den Bedarf |
+| Effizienz | 0,18 | Schlafzeit gegen Zeit im Bett |
+| Tiefschlaf und REM | 0,17 | Anteil erholsamer Phasen |
+| Regelmäßigkeit | 0,15 | Streuung von Einschlaf- und Aufwachzeit über 7 Tage |
+| **Nächtliche Ruhe** | 0,15 | HRV über und Ruhepuls unter deiner Baseline |
+
+Fällt die nächtliche Ruhe niedrig aus, während der Rest stimmt, schreibt die App es in die Schlafkarte: lang geschlafen, aber unruhig. Ohne Baseline bleibt der Anteil leer und die übrigen werden neu gewichtet. Ein Rest Überschneidung bleibt bewusst: HRV und Puls zählen über diesen Anteil mit etwa 3 % ein zweites Mal in die Recovery hinein.
+
+### Logbuch in der Tagesform
+
+Alkohol, Koffein und Wasser wirken auf HRV, Puls und Schlaf – und stecken damit schon in den Messwerten. Trotzdem zählen sie zusätzlich mit, aber klein und immer mit Begründung:
+
+| Eintrag | Punkte |
+| --- | --- |
+| Alkohol am Abend davor | −3, je weiteres Getränk −1, höchstens −5 |
+| Letztes Koffein nach 17 Uhr | −2 |
+| Mehr als 400 mg Koffein | −1 |
+| Unter 60 % des Trinkziels | −2 |
+| Trinkziel erreicht | +1 |
+
+Zusammen höchstens −6 und +1 auf die Tagesform. Die Gründe stehen auf „Heute“ unter **Was deine Werte bewegt**. Abschaltbar unter **Profil → Einstellungen → Logbuch zählt zur Tagesform**, alle Punkte änderbar unter **Modell und Gewichte**.
+
+### Störfaktoren an den Nachtwerten
+
+Fällt ein Nachtwert um mehr als eine Standardabweichung aus dem Rahmen, sucht die App nach einer bekannten Erklärung und schreibt sie unter die Werte:
+
+| Erklärung | Betrifft |
+| --- | --- |
+| Alkohol am Abend davor | Ruhepuls, HRV |
+| Hartes Training am Tag davor (Strain ab 70) | Ruhepuls, HRV, Atemfrequenz |
+| Letztes Koffein nach 17 Uhr | HRV |
+| Nacht unter 5 Stunden | Ruhepuls, HRV |
+
+Dieselbe Liste benutzt die Infektwarnung: Gibt es eine Erklärung und kein Krankheitsgefühl, bleibt es eine Beobachtung statt einer Warnung, und der Text nennt den Grund samt Größenordnung („Alkohol hebt den Ruhepuls typischerweise um 5 bis 10 bpm“). Steht im Logbuch nichts, sagt die App auch das.
+
+### Gewicht über die Zeit
+
+**Profil → Körperdaten → Gewicht** nimmt einzelne Messungen mit Datum entgegen, statt einen festen Wert zu überschreiben. Jede Eingabe wird wie ein Messwert aus Apple Health gespeichert, gleicht sich also mit anderen Geräten ab und erscheint in der Datenprüfung. Darunter stehen der Verlauf der letzten 90 Tage, die letzte Messung und die Veränderung gegenüber den 30 Tagen davor; im Reiter **Verlauf** gibt es dieselbe Kurve über den gewählten Zeitraum. Eine Waage, die an Health schreibt, füllt den Verlauf von selbst. Zwischen zwei Messungen gilt die letzte, längstens 21 Tage.
 
 ## Täglicher Ablauf
 
@@ -279,9 +383,15 @@ Recovery misst keinen absoluten Wert, sondern den Abstand zu deinen eigenen Näc
 | `js/analysis/insights.js` | Einflussfaktoren (auch je Supplement), Permutationstest, Benjamini-Hochberg, Ridge |
 | `js/model/hints.js` | Hinweise des Tages und die Begründung, wenn die Tagesform fehlt |
 | `js/model/earlywarning.js` | Frühwarnungen: Auslöser, Störfaktoren, Pausen |
+| `js/model/lifestyle.js` | Logbuch-Zuschlag auf die Tagesform und die Erklärungen für auffällige Nachtwerte |
+| `js/ui/cards.js` | Karten auf „Heute“: Katalog, Sichtbarkeit, Vorschlag zum Ausblenden |
+| `js/model/coverage.js` | Datenprüfung: Zustand je Messwert, welche Berechnung woran hängt, Text der Meldung |
+| `js/data/normalize.js` | Typnamen, Einheiten, Messbereiche; sagt auch, warum ein Wert verworfen wurde |
 | `js/norms/references.js` | Normal- und Richtwerte mit Quellen für alle Infopunkte |
 | `js/context/` | Standort, Wetter, Feinstaub und Pollen von Open-Meteo |
 | `js/model/` | Formeln für Baseline, Recovery, Schlaf, Strain, Balance, Fitness, Tagesform |
+| `css/app.css` | Farbtoken je Variante (`[data-palette="rot"]`), Hell und Dunkel |
+| `design/` | zweite Design-Variante im Stil von Apple Health, eigene Zählung in `design/version.js` |
 | `js/ui/` | Oberfläche (Preact mit htm, ohne Build-Schritt) |
 | `sw.js` | Offline-Zwischenspeicher je Version |
 

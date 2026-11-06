@@ -1,6 +1,6 @@
 // Ansicht "Heute": Tagesform, Recovery, Schlaf, Strain, Gründe, Vitalwerte, Umwelt, Hinweise.
 import { html, useState } from '../vendor/preact-htm.js';
-import { state, update, shiftDate, navigate, openCheck, tryDemo, leaveDemo, patchSettings, useCurrentLocation, toast, importShortcutText, setHomeView, firstDataDay } from './state.js';
+import { state, update, shiftDate, navigate, openCheck, tryDemo, leaveDemo, patchSettings, saveSettings, useCurrentLocation, toast, importShortcutText, setHomeView, firstDataDay } from './state.js';
 import { Dial, Ring, StatusChip, Contributions, RangeBar, Segmented, zoneOf, zoneClass } from './components.js';
 import { PeriodChart } from './charts.js';
 import { periodAverages, periodSummary } from '../model/periods.js';
@@ -9,7 +9,10 @@ import { Icon } from './icons.js';
 import { num, hours, clock, dayLabel, dateFull, signed, ago } from './format.js';
 import { addDays } from '../core/time.js';
 import { summarize, formGap } from '../model/hints.js';
+import { cardOn, withCard } from './cards.js';
+import { explainNight } from '../model/lifestyle.js';
 import { earlyWarnings, snoozedWarnings, snoozeWarning } from '../model/earlywarning.js';
+import { dataReport, dataAlert } from '../model/coverage.js';
 import { slotDone } from '../survey/engine.js';
 import { WORKOUT_LABEL } from '../data/normalize.js';
 import { formatPlace } from '../context/location.js';
@@ -210,6 +213,74 @@ function EarlyWarnings() {
   </section>`;
 }
 
+/**
+ * Meldung, wenn Messwerte nicht ankommen oder sich nicht lesen ließen, mit den Berechnungen,
+ * die deshalb ausfallen. „Nicht mehr zeigen“ merkt sich den Zustand, bis er sich ändert.
+ */
+function DataAlert() {
+  const repo = state.repo;
+  const s = repo.settings;
+  if (!s.display.dataCheck) return null;
+  const rep = dataReport({ index: repo.index, results: state.results, settings: s, lastImport: state.lastImport, today: state.today });
+  const a = dataAlert(rep, repo.meta.dataAck);
+  if (!a) return null;
+  const ack = async () => {
+    await repo.patchMeta({ dataAck: a.ack });
+    update({ version: state.version + 1 });
+    toast('Hinweis ausgeblendet. Wieder einschaltbar unter Profil → Einstellungen.');
+  };
+  return html`<div class=${`banner data ${a.level}`} role="status">
+    <${Icon} name=${a.level === 'error' ? 'alert' : 'info'} size=${18} />
+    <div class="grow stack-s">
+      <div><b>${a.title}.</b>${a.blocked.length
+        ? ` Dadurch nicht möglich: ${a.blocked.slice(0, 3).join(', ')}${a.blocked.length > 3 ? ` und ${a.blocked.length - 3} weitere` : ''}.`
+        : ' Die Berechnungen laufen weiter.'}</div>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn small" onClick=${() => navigate('profil', 'daten')}>Prüfung öffnen</button>
+        <button type="button" class="btn small ghost" onClick=${ack}>Ausblenden</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/** Warum ein Nachtwert heute aus dem Rahmen fällt – mit der bekannten Ursache, wenn es eine gibt. */
+function NightReason({ d, prev }) {
+  const { odd, causes } = explainNight(d, prev, state.repo.settings);
+  if (!odd.length) return null;
+  const werte = odd.map((o) => `${o.label} ${o.dir} deinem Schnitt`).join(', ');
+  if (!causes.length) {
+    return html`<p class="small ink2" style="margin-top:8px">${werte.charAt(0).toUpperCase() + werte.slice(1)}. Im Logbuch steht nichts, was das erklärt.</p>`;
+  }
+  return html`<div class="hint c-info" style="margin-top:8px">
+    <${Icon} name="info" size=${18} />
+    <div><b>${werte.charAt(0).toUpperCase() + werte.slice(1)}.</b> ${causes.map((c) => c.text).join(' ')}
+      <span class="tiny muted"> Die Frühwarnung rechnet das mit ein.</span></div>
+  </div>`;
+}
+
+/** Woraus sich der Schlafbedarf dieser Nacht zusammensetzt. */
+function NeedParts({ d }) {
+  const p = d.sleepNeedParts;
+  if (!p) return null;
+  const teile = [
+    p.debt > 0.05 ? `${num(p.debt, 1)} h Schlafschuld der Vornächte` : null,
+    p.strain > 0.05 ? `${num(p.strain, 1)} h für die Belastung davor` : null,
+    p.recovery > 0.05 ? `${num(p.recovery, 1)} h für die schwache Erholung` : null,
+    p.nap < -0.05 ? `${num(-p.nap, 1)} h weniger wegen des Mittagsschlafs` : null,
+  ].filter(Boolean);
+  if (!teile.length) return null;
+  return html`<p class="tiny muted" style="margin-top:8px">Bedarf ${hours(d.sleepNeedH * 60)} = ${hours(p.base * 60)} Grundbedarf + ${teile.join(' + ')}.</p>`;
+}
+
+/** Blendet eine Karte aus, die für diesen Tag nichts zu zeigen hat. */
+function HideCard({ id }) {
+  const hide = async () => {
+    await saveSettings(withCard(state.repo.settings, id, false));
+    toast('Karte ausgeblendet. Wieder einschalten unter Profil \u2192 Einstellungen \u2192 Karten auf \u201eHeute\u201c.');
+  };
+  return html`<button type="button" class="linkbtn" onClick=${hide}>Karte ausblenden</button>`;
+}
+
 function SyncBanner() {
   const st = state.sync;
   if (!st?.linked || (st.state !== 'reauth' && st.state !== 'error')) return null;
@@ -282,6 +353,7 @@ function Environment({ date }) {
 
 export function TodayView() {
   const settings = state.repo.settings;
+  const vis = (id) => cardOn(settings, id);
   const date = state.date;
   const d = state.results.days.get(date);
   const prev = state.results.days.get(addDays(date, -1));
@@ -352,7 +424,7 @@ export function TodayView() {
       <${SyncBanner} />
       ${!hasAny && !state.demo ? html`<${Empty} />` : null}
       ${importReason ? html`<${ImportHint} lastSample=${lastSample} reason=${importReason} />` : null}
-      ${isToday && !state.demo ? html`<${EarlyWarnings} />` : null}
+      ${isToday && !state.demo ? html`<${EarlyWarnings} /><${DataAlert} />` : null}
       ${gate ? html`<${MorningGate} />` : null}
       ${(gate || !hasAny) && isToday ? html`<${JournalToday} />` : null}
       ${hasAny && !gate && d ? html`
@@ -367,7 +439,7 @@ export function TodayView() {
           ${d.form != null ? html`<p class="hero-text">${summarize(d, settings)}</p>`
             : html`<p class="hero-text"><b>${gap.title}.</b> ${gap.text}${gap.short === 'Nachtwerte fehlen' || gap.short === 'Vergleichswerte fehlen' ? html` <button type="button" class="linkbtn" onClick=${() => navigate('profil', 'daten')}>Die letzten Nächte prüfen</button>` : null}</p>`}
         </section>
-        <section class="rings" aria-label="Tageswerte">
+        ${vis('rings') ? html`<section class="rings" aria-label="Tageswerte">
           <div class="ring-tile">
             <span class="tile-info"><${InfoButton} k="recovery" value=${d.recovery} label="Recovery" /></span>
             <${Ring} value=${d.recovery} color=${zoneClass(d.recovery, settings)} label="Recovery" />
@@ -386,17 +458,22 @@ export function TodayView() {
             <div class="ring-label">Strain${d.strainPartial ? ' heute' : ''}</div>
             <div class="ring-sub">${strainSub}</div>
           </div>
-        </section>
+        </section>` : null}
         ${isToday ? html`<${JournalToday} />` : null}
-        <${FormPeriods} />
+        ${vis('periods') ? html`<${FormPeriods} />` : null}
         <${ProfileHint} />
         <${BackupHint} />
-        ${contrib.length ? html`<section class="card">
-          <div class="card-head"><h2>Was deine Recovery bewegt</h2><span class="tiny muted">Punkte</span></div>
-          <${Contributions} items=${contrib} />
-          <p class="tiny muted" style="margin-top:10px">Gegenüber einem Tag, an dem alles genau deinem Normalwert entspricht (Recovery 50).</p>
+        ${vis('contrib') && (contrib.length || d.lifestyle?.reasons?.length) ? html`<section class="card">
+          <div class="card-head"><h2>Was deine Werte bewegt</h2><span class="tiny muted">Punkte</span></div>
+          ${contrib.length ? html`<${Contributions} items=${contrib} />
+          <p class="tiny muted" style="margin-top:10px">Recovery gegenüber einem Tag, an dem alles genau deinem Normalwert entspricht (Recovery 50).</p>` : null}
+          ${d.lifestyle?.reasons?.length ? html`<hr class="divider" />
+            <div class="card-head" style="margin-bottom:6px"><h3 style="font-size:15px;margin:0">Dazu aus dem Logbuch</h3>
+              <span class="tnum small" style=${`color:var(--${d.lifestyle.delta < 0 ? 'crit' : 'good'})`}>${d.lifestyle.delta > 0 ? '+' : d.lifestyle.delta < 0 ? '−' : ''}${num(Math.abs(d.lifestyle.delta))} auf die Tagesform</span></div>
+            <ul class="bullets small">${d.lifestyle.reasons.map((r) => html`<li key=${r.id}>${r.text} <span class="muted tnum">(${r.points > 0 ? '+' : '−'}${num(Math.abs(r.points))})</span></li>`)}</ul>
+            <p class="tiny muted" style="margin-top:6px">Alkohol, Koffein und Wasser stecken zum Teil schon in HRV, Puls und Schlaf. Deshalb zählt das Logbuch nur mit wenigen Punkten dazu, höchstens ${num(state.repo.settings.model.form.lifestyle.cap)} nach unten. Abschaltbar unter Profil → Einstellungen → Modell und Gewichte.</p>` : null}
         </section>` : null}
-        ${d.hints?.length ? html`<section class="card" aria-label="Hinweise">
+        ${vis('hints') && d.hints?.length ? html`<section class="card" aria-label="Hinweise">
           ${d.hints.map((h) => html`<div class=${`hint ${{ critical: 'c-crit', warning: 'c-warn', info: 'c-info' }[h.level]}`}>
             <${Icon} name=${h.level === 'info' ? 'info' : 'alert'} size=${20} />
             <div><b>${h.title}</b><p>${h.text}</p></div>
@@ -406,7 +483,7 @@ export function TodayView() {
           <div class="grow"><h3>Abendcheck</h3><p class="small muted">Was heute war, in etwa 30 Sekunden.</p></div>
           <button class="btn primary small" onClick=${() => openCheck('evening', state.today)}>Starten</button>
         </section>` : null}
-        <section class="card">
+        ${vis('night') ? html`<section class="card">
           <div class="card-head"><h2>Letzte Nacht</h2>${d.sleep ? html`<span class="tiny muted tnum">${clock(d.sleep.onset)}–${clock(d.sleep.wake)}</span>` : null}</div>
           <div class="vitals">
             <${Vital} name="HRV" k="hrv" value=${d.hrv} unit="ms" range=${rangeOf(d.base?.lnHrv, 0.06, Math.exp)} z=${d.z?.hrv} />
@@ -415,10 +492,11 @@ export function TodayView() {
             <${Vital} name="Blutsauerstoff" k="spo2" value=${d.spo2} unit="%" digits=${1} range=${rangeOf(d.base?.spo2, 0.7)} z=${d.z?.spo2} />
             <${Vital} name="Hauttemperatur" k="temp" value=${d.temp} unit="°C" digits=${1} range=${rangeOf(d.base?.temp, 0.15)} z=${d.z?.temp} />
           </div>
-          ${d.hrv == null && d.rhr == null ? html`<p class="small muted">Keine Nachtwerte. Prüfe, ob Zepp HRV und Herzfrequenz an Apple Health schreibt.</p>` : null}
+          ${d.hrv == null && d.rhr == null ? html`<p class="small muted">Keine Nachtwerte. Prüfe, ob Zepp HRV und Herzfrequenz an Apple Health schreibt. <${HideCard} id="night" /></p>` : null}
+          <${NightReason} d=${d} prev=${prev} />
           <p class="tiny muted" style="margin-top:8px">Der graue Balken ist dein persönlicher Normalbereich. Das (i) zeigt die allgemeinen Richtwerte.</p>
-        </section>
-        ${d.sleep ? html`<section class="card">
+        </section>` : null}
+        ${vis('sleep') && d.sleep ? html`<section class="card">
           <div class="card-head"><h2>Schlaf</h2><span class="tiny muted row" style="gap:2px">Bedarf ${hours(d.sleepNeedH * 60)}<${InfoButton} k="sleepNeed" value=${d.sleepNeedH} label="Schlafbedarf" /></span></div>
           <dl class="kv">
             <${KV} label="Geschlafen" value=${hours(d.sleep.asleepMin)} k="asleep" infoValue=${d.sleep.asleepMin} />
@@ -429,9 +507,13 @@ export function TodayView() {
             ${d.sleep.latencyMin != null ? html`<${KV} label="Eingeschlafen nach" value=${`${num(d.sleep.latencyMin)} min`} k="latency" infoValue=${d.sleep.latencyMin} />` : null}
             <${KV} label="Aufwachphasen" value=${d.sleep.wakeEpisodes} k="wake" infoValue=${d.sleep.wakeEpisodes} />
             ${d.sleepParts?.regularity != null ? html`<${KV} label="Regelmäßigkeit (7 Tage)" value=${`${num(d.sleepParts.regularity)} / 100`} k="regularity" infoValue=${d.sleepParts.regularity} />` : null}
+            ${d.sleepParts?.calm != null ? html`<${KV} label="Nächtliche Ruhe" value=${`${num(d.sleepParts.calm)} / 100`} />` : null}
           </dl>
+          <${NeedParts} d=${d} />
+          ${d.sleepParts?.calm != null && d.sleepScore >= 70 && d.sleepParts.calm <= 45 ? html`<p class="small ink2" style="margin-top:8px">
+            Lang und durchgehend geschlafen, aber unruhig: Puls und HRV lagen schlechter als sonst. Deshalb kann der Schlaf-Score hoch und die Recovery trotzdem niedrig sein.</p>` : null}
         </section>` : null}
-        <section class="card">
+        ${vis('load') ? html`<section class="card">
           <div class="card-head"><h2>Belastung</h2></div>
           <dl class="kv">
             ${d.load != null ? html`<${KV} label=${d.strainPartial ? 'Last bisher' : 'Last'} value=${num(d.load)} k="load" infoValue=${d.load} />` : null}
@@ -448,9 +530,9 @@ export function TodayView() {
             <span><b>${WORKOUT_LABEL[w.kind] || 'Training'}</b> <span class="muted">${clock(w.t)} · ${num(w.durMin)} min</span></span>
             <span class="muted tnum">${[w.kcal > 0 ? `${num(w.kcal)} kcal` : '', w.avgHr ? `Ø ${num(w.avgHr)} bpm` : ''].filter(Boolean).join(' · ')}</span></div>`)}` : null}
           ${d.energy != null ? html`<p class="tiny muted" style="margin-top:8px">Aktive Energie ohne Grundumsatz, so wie Apple Health sie zählt.</p>` : null}
-          ${d.load == null && !d.workouts?.length ? html`<p class="small muted">Keine Pulsdaten für diesen Tag.</p>` : null}
-        </section>
-        <${Environment} date=${date} />
+          ${d.load == null && !d.workouts?.length ? html`<p class="small muted">Keine Pulsdaten für diesen Tag. <${HideCard} id="load" /></p>` : null}
+        </section>` : null}
+        ${vis('environment') ? html`<${Environment} date=${date} />` : null}
       ` : null}
       ${hasAny && !d ? html`<section class="card"><p class="muted">Für diesen Tag gibt es keine Daten.</p></section>` : null}
     </main>`;

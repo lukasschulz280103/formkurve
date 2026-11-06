@@ -5,7 +5,13 @@ import { parseLooseDate } from '../core/time.js';
 import { typeFromName, normalizeValue } from '../data/normalize.js';
 
 function emptyStats() {
-  return { lines: 0, parsed: 0, skipped: 0, implausible: 0, unknownTypes: {}, byType: {}, sources: {}, minT: null, maxT: null };
+  return { lines: 0, parsed: 0, skipped: 0, implausible: 0, unknownTypes: {}, rejected: {}, byType: {}, sources: {}, minT: null, maxT: null };
+}
+
+/** Verworfenen Wert je Typ und Grund mitzählen, damit die App später sagen kann, was fehlt. */
+export function countReject(stats, type, reason) {
+  const r = (stats.rejected[type] ||= { nan: 0, range: 0, date: 0 });
+  r[reason] = (r[reason] || 0) + 1;
 }
 
 function addSample(out, stats, rawType, start, end, value, unit, source) {
@@ -20,12 +26,15 @@ function addSample(out, stats, rawType, start, end, value, unit, source) {
   let e = parseLooseDate(end);
   if (!Number.isFinite(t)) {
     stats.skipped++;
+    countReject(stats, type, 'date');
     return;
   }
   if (!Number.isFinite(e) || e < t) e = t;
-  const v = normalizeValue(type, value, unit);
+  const info = {};
+  const v = normalizeValue(type, value, unit, info);
   if (!Number.isFinite(v)) {
     stats.implausible++;
+    countReject(stats, type, info.reason || 'nan');
     return;
   }
   const src = String(source || '').trim() || 'Kurzbefehl';

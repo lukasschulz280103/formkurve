@@ -4,6 +4,7 @@
 import { isNum, median } from '../core/stats.js';
 import { addDays } from '../core/time.js';
 import { hasSymptom } from '../survey/catalog.js';
+import { nightDisturbances } from './lifestyle.js';
 
 /** Die letzten n Tage bis einschließlich `today`, neueste zuerst. */
 function lastDays(days, today, n) {
@@ -17,13 +18,17 @@ function lastDays(days, today, n) {
 
 const valuesOf = (list, pick) => list.map(pick).filter(isNum);
 
-/** Was an einer Nacht sonst schuld sein kann: Alkohol oder hartes Training am Tag davor. */
-function disturbance(days, date, p) {
+/**
+ * Was an einer Nacht sonst schuld sein kann. Dieselben Erklärungen, die auch unter den
+ * Nachtwerten stehen, damit Karte und Warnung nie Verschiedenes behaupten.
+ */
+function disturbance(days, date, settings) {
+  const day = days.get(date);
   const prev = days.get(addDays(date, -1));
-  if (!prev) return null;
-  if (prev.answers?.A3 === true) return 'Alkohol am Abend davor';
-  if (isNum(prev.strain) && prev.strain >= p.hardStrain) return 'hartes Training am Tag davor';
-  if (prev.excluded) return prev.excluded;
+  if (!prev && !day) return null;
+  const list = nightDisturbances(day, prev, settings).filter((x) => x.affects.includes('rhr') || x.affects.includes('hrv'));
+  if (list.length) return { label: list[0].cause, text: list[0].text };
+  if (prev?.excluded) return { label: prev.excluded, text: null };
   return null;
 }
 
@@ -31,7 +36,7 @@ function disturbance(days, date, p) {
  * Beginnende Infektion: Ruhepuls und Atemfrequenz über, HRV unter der eigenen Baseline,
  * mindestens zwei der drei Werte, mehrere Nächte nacheinander.
  */
-function infection(days, today, p) {
+function infection(days, today, p, settings) {
   const nights = [];
   for (let i = 0; i < p.nights; i++) {
     const date = addDays(today, -i);
@@ -43,7 +48,7 @@ function infection(days, today, p) {
     if (isNum(d.z?.hrv) && d.z.hrv <= -p.z) sig.push('HRV gesenkt');
     if (isNum(d.z?.resp) && d.z.resp >= p.z) sig.push('Atemfrequenz erhöht');
     if (sig.length < 2) return null;
-    nights.push({ date, sig, stoer: disturbance(days, date, p) });
+    nights.push({ date, sig, stoer: disturbance(days, date, settings) });
   }
   const sig = [...new Set(nights.flatMap((n) => n.sig))];
   const symptom = nights.some((n) => hasSymptom(days.get(n.date)?.answers || {}));
@@ -53,7 +58,8 @@ function infection(days, today, p) {
   const text = [
     `${sig.join(', ')} – und das ${nights.length} Nächte nacheinander.`,
     symptom ? 'Dein Morgencheck meldet dazu ein Krankheitsgefühl.' : null,
-    stoer ? `Das kann auch an ${stoer} liegen.` : 'So sieht es oft aus, bevor ein Infekt spürbar wird.',
+    stoer ? `Das kann auch an ${stoer.label} liegen.` : 'So sieht es oft aus, bevor ein Infekt spürbar wird.',
+    stoer?.text || null,
   ].filter(Boolean).join(' ');
   return {
     id: 'infekt',
@@ -158,7 +164,7 @@ export function earlyWarnings({ days, today, settings, snoozed = [] }) {
   if (!p) return [];
   const out = [];
   for (const fn of DETECTORS) {
-    const w = fn(days, today, p);
+    const w = fn(days, today, p, settings);
     if (w && !snoozed.includes(w.id)) out.push(w);
   }
   return out.sort((a, b) => (a.level === b.level ? 0 : a.level === 'warn' ? -1 : 1));

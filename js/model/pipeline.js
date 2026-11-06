@@ -5,11 +5,12 @@ import { hrMaxOf } from '../core/config.js';
 import { buildSessions, assignSleepDays } from './sleep.js';
 import {
   zScore, baselineOf, Z_FLOOR, zoneMinutes, edwardsTrimp, strainFromLoad, strengthLoad,
-  sleepNeedParts, regularityScore, sleepScore, vitalZ, sleepZ, recoveryScore, balanceScore,
+  sleepNeedParts, regularityScore, sleepScore, calmScore, vitalZ, sleepZ, recoveryScore, balanceScore,
   fitnessInput, ewmaAlpha, formScore,
 } from './scores.js';
 import { exclusionReason, subjectiveZ, trainingFromSurvey } from '../survey/engine.js';
 import { daySummary, withJournal } from '../journal/journal.js';
+import { lifestyleAdjust } from './lifestyle.js';
 import { buildHints } from './hints.js';
 
 function sleepByDay(index, p) {
@@ -238,9 +239,17 @@ export function computeAll({ index, workouts = [], survey = new Map(), journal =
       const x = prev(n);
       return x?.sleep && isNum(x.sleepNeedCoreH) ? x.sleepNeedCoreH - x.sleep.asleepMin / 60 : null;
     });
-    const need = sleepNeedParts({ base: settings.profile.sleepNeedBase, strainPrev: p1?.strain ?? null, debtsH: debts, napMinPrev: p1?.napMin || 0 }, m.sleep);
+    const need = sleepNeedParts({
+      base: settings.profile.sleepNeedBase,
+      strainPrev: p1?.strain ?? null,
+      strainPrev2: prev(2)?.strain ?? null,
+      recoveries: [p1?.recovery ?? null, prev(2)?.recovery ?? null],
+      debtsH: debts,
+      napMinPrev: p1?.napMin || 0,
+    }, m.sleep);
     d.sleepNeedH = need.need;
     d.sleepNeedCoreH = need.core;
+    d.sleepNeedParts = need.parts;
     if (d.sleep) {
       const onsets = [];
       const wakes = [];
@@ -252,7 +261,8 @@ export function computeAll({ index, workouts = [], survey = new Map(), journal =
         }
       }
       const reg = regularityScore(onsets, wakes, m.sleep);
-      const ss = sleepScore({ asleepMin: d.sleep.asleepMin, needH: d.sleepNeedH, efficiency: d.sleep.efficiency, restorativePct: d.sleep.restorativePct, regularity: reg }, m.sleep);
+      const calm = calmScore({ hrv: d.z.hrv, rhr: d.z.rhr }, m.sleep);
+      const ss = sleepScore({ asleepMin: d.sleep.asleepMin, needH: d.sleepNeedH, efficiency: d.sleep.efficiency, restorativePct: d.sleep.restorativePct, regularity: reg, calm }, m.sleep);
       d.sleepScore = ss.score;
       d.sleepParts = ss.parts;
       d.sleepDebtH = Math.max(0, d.sleepNeedH - d.sleep.asleepMin / 60);
@@ -320,7 +330,10 @@ export function computeAll({ index, workouts = [], survey = new Map(), journal =
 
     // Tagesform
     const fs = formScore({ r: [d.recovery, prev(1)?.recovery, prev(2)?.recovery], s: [d.sleepScore, prev(1)?.sleepScore, prev(2)?.sleepScore], balance: d.balance, fitness: d.fitness }, m.form);
-    d.form = fs.score;
+    // Logbuch-Zuschlag: klein, gedeckelt und mit Begründung, siehe model/lifestyle.js
+    d.lifestyle = lifestyleAdjust({ day: d, prev: p1, settings });
+    d.formBase = fs.score;
+    d.form = isNum(fs.score) ? Math.max(0, Math.min(100, fs.score + d.lifestyle.delta)) : fs.score;
     d.rEff = fs.rEff;
     d.sEff = fs.sEff;
   }

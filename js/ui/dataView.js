@@ -12,11 +12,15 @@ import { Segmented, Switch, Stepper, Progress } from './components.js';
 import { Icon } from './icons.js';
 import { num, ago, mb, hours, dateShort } from './format.js';
 import { TYPES } from '../data/normalize.js';
+import { dataReport, rejectText } from '../model/coverage.js';
+import { TimeChart } from './charts.js';
+import { isNum, mean } from '../core/stats.js';
+import { addDays, todayKey } from '../core/time.js';
+import { HOME_CARDS, cardOn, withCard, emptyCards } from './cards.js';
 import { PARAMS, DEFAULTS, getPath, setPath, hrMaxOf, clone, ageOf, bmiOf } from '../core/config.js';
 import { searchPlace, ATTRIBUTION } from '../context/weather.js';
 
 const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-const REQUIRED = ['hr', 'hrv', 'sleep'];
 const EXAMPLE = 'Herzfrequenz;2026-10-26T03:12:00+01:00;2026-10-26T03:12:00+01:00;54;count/min;Zepp';
 
 function ImportSummary({ s }) {
@@ -31,25 +35,57 @@ function ImportSummary({ s }) {
   </div>`;
 }
 
-function Diagnose() {
-  const idx = state.repo.index;
-  const types = Object.keys(TYPES).filter((t) => idx.counts[t]);
-  if (!types.length) return null;
-  return html`<section class="card">
-    <div class="card-head"><h2>Was in deinen Daten steckt</h2></div>
-    <div class="typegrid">
-      <span class="h">Typ</span><span class="h">Werte</span><span class="h">Zeitraum</span>
-      ${types.map((t) => {
-        const total = Object.values(idx.counts[t]).reduce((s, x) => s + x, 0);
-        const r = idx.range[t];
-        return html`<span>${TYPES[t].label}</span><span class="tnum">${num(total)}</span><span class="tnum muted">${dateShort(r[0])} – ${dateShort(r[1])}</span>`;
-      })}
-    </div>
-    <hr class="divider" />
-    <div class="stack small">
-      ${REQUIRED.map((t) => html`<div class="row"><span class=${idx.counts[t] ? 'ok' : 'bad'}><${Icon} name=${idx.counts[t] ? 'ok' : 'alert'} size=${16} /></span>
-        <span>${TYPES[t].label}: ${idx.counts[t] ? 'vorhanden' : 'fehlt – für Recovery nötig. Prüfe die Zepp-Freigaben in Health.'}</span></div>`)}
-    </div>
+const ROW_ICON = { ok: 'ok', partial: 'ok', stale: 'alert', none: 'info', dropped: 'alert' };
+
+/** Ein Wert in der Prüfliste: Zustand, Umfang und – wenn er fehlt – die Folge. */
+function CheckRow({ row }) {
+  const { status, need, blocks } = row;
+  const broken = status !== 'ok' && status !== 'partial';
+  // Ohne Folge keine Farbe: ein Wert, den das Band nie geliefert hat, ist kein Fehler
+  const costs = broken && (blocks.length || (need !== 'extra' && row.shared.length));
+  const tone = !broken ? 'ok' : !costs ? 'muted' : need === 'core' && status !== 'stale' ? 'bad' : 'warn-ink';
+  const state_ = status === 'stale'
+    ? `keine neuen Werte seit ${dateShort(row.to)}`
+    : status === 'dropped'
+      ? 'kommt an, ließ sich aber nicht lesen'
+      : status === 'none'
+        ? (costs ? (row.plural ? 'fehlen' : 'fehlt') : 'nicht vorhanden')
+        : `${num(row.total)} Werte · ${dateShort(row.from)}–${dateShort(row.to)}`;
+  return html`<li>
+    <span class=${`s ${tone}`}><${Icon} name=${broken && !costs ? 'info' : ROW_ICON[status]} size=${17} /></span>
+    <span class="grow stack-s">
+      <span><b>${row.label}</b> <span class="muted small">${state_}</span></span>
+      ${blocks.length ? html`<span class="small why">Dadurch nicht möglich: ${blocks.join(', ')}.</span>` : null}
+      ${!blocks.length && row.shared.length ? html`<span class="small why">Zusammen mit den anderen fehlenden Werten nötig für ${row.shared.length === 1 ? row.shared[0] : `${row.shared.length} Berechnungen`} – siehe unten.</span>` : null}
+      ${broken && row.hint ? html`<span class="tiny muted">${row.hint}</span>` : null}
+      ${row.dropped ? html`<span class="tiny muted">Beim letzten Import verworfen: ${rejectText(row.type, row.reject)}.</span>` : null}
+    </span>
+  </li>`;
+}
+
+function DataCheck() {
+  const repo = state.repo;
+  const rep = dataReport({ index: repo.index, results: state.results, settings: repo.settings, lastImport: state.lastImport, today: state.today });
+  if (rep.level === 'none') return null;
+  const n = rep.matters.length;
+  const broken = (r) => r.status !== 'ok' && r.status !== 'partial';
+  const rows = [...rep.rows].sort((a, b) => Number(broken(b)) - Number(broken(a)));
+  return html`<section class="card" aria-labelledby="h-dcheck">
+    <div class="card-head"><h2 id="h-dcheck">Datenprüfung</h2><span class="tiny muted">${n ? `${n} ${n === 1 ? 'Wert kostet' : 'Werte kosten'} eine Berechnung` : 'alles Wichtige da'}</span></div>
+    <p class="small ink2" style="margin-bottom:8px">Welche Messwerte in Formkurve ankommen und welche Berechnungen ohne sie nicht gehen. Ein fehlender Wert ist kein Fehler der App: meist misst das Band ihn nicht oder er ist in Apple Health nicht freigegeben.</p>
+    ${rep.outdated ? html`<p class="small warn-ink" style="margin-bottom:8px">Die neuesten Messwerte sind vom ${dateShort(rep.outdated)} – was hier steht, gilt bis dahin. Für die Tage danach fehlt alles; importiere zuerst.</p>` : null}
+    <ul class="dcheck">
+      ${rows.map((r) => html`<${CheckRow} key=${r.type} row=${r} />`)}
+    </ul>
+    ${rep.unknown.length ? html`<p class="tiny muted" style="margin-top:8px">Beim letzten Import nicht erkannt: ${rep.unknown.map(([k, n]) => `${k} (${num(n)})`).join(', ')}. Diese Typen braucht Formkurve nicht; melde sie, wenn ein wichtiger darunter ist.</p>` : null}
+    ${rep.blocked.length ? html`<hr class="divider" />
+      <div class="stack-s"><b class="small">Diese Berechnungen laufen gerade nicht</b>
+        <ul class="bullets small">${rep.blocked.map((b) => html`<li key=${b.id}><b>${b.label}</b> – braucht ${b.why}; fehlt: ${b.missing.join(', ')}.</li>`)}</ul></div>` : null}
+    ${rep.pending.length ? html`<hr class="divider" />
+      <div class="stack-s"><b class="small">Werte sind da, es fehlt noch Verlauf</b>
+        <ul class="bullets small">${rep.pending.map((b) => html`<li key=${b.id}><b>${b.label}</b> – ${b.why}.</li>`)}</ul>
+        <p class="tiny muted">Ein Apple-Health-Export mit älteren Nächten füllt den Vergleich sofort auf.</p></div>` : null}
+    ${rep.nights?.missing ? html`<p class="tiny muted" style="margin-top:8px">In ${rep.nights.missing} der letzten ${rep.nights.total} Nächte gab es weder HRV noch Puls: für diese Tage bleiben Recovery und Tagesform leer.</p>` : null}
   </section>`;
 }
 
@@ -267,6 +303,90 @@ function BodyData() {
   </section>`;
 }
 
+/**
+ * Gewicht als Verlauf: jede Eingabe ist eine Messung mit Datum und landet als Messwert
+ * neben den Daten aus Health. Die letzte Messung füllt zugleich das Profil für den BMI.
+ */
+function WeightLog() {
+  const [kg, setKg] = useState('');
+  const [day, setDay] = useState(state.today);
+  const [busy, setBusy] = useState(false);
+  const res = state.results;
+  const dates = res?.dates || [];
+  const points = [];
+  for (const k of dates) {
+    const v = res.days.get(k)?.mass;
+    if (isNum(v)) points.push({ date: k, kg: v });
+  }
+  const letzte = points[points.length - 1] || null;
+  const window90 = dates.slice(-90);
+  let carry = null;
+  let age = 0;
+  const line = window90.map((k) => {
+    const v = res.days.get(k)?.mass;
+    if (isNum(v)) {
+      carry = v;
+      age = 0;
+      return v;
+    }
+    age++;
+    return carry != null && age <= 21 ? carry : null;
+  });
+  const hat = line.some(isNum);
+  const letzte30 = points.filter((x) => x.date > addDays(state.today, -30));
+  const davor = points.filter((x) => x.date <= addDays(state.today, -30) && x.date > addDays(state.today, -60));
+  const trend = letzte30.length && davor.length ? mean(letzte30.map((x) => x.kg)) - mean(davor.map((x) => x.kg)) : null;
+
+  const speichern = async (e) => {
+    e.preventDefault();
+    const v = Number(String(kg).replace(',', '.'));
+    if (!Number.isFinite(v) || v < 25 || v > 300) {
+      toast('Bitte ein Gewicht zwischen 25 und 300 kg eintragen', 'error');
+      return;
+    }
+    if (day > state.today) {
+      toast('Ein Datum in der Zukunft geht nicht', 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      // 8 Uhr morgens: Gewicht wird üblicherweise nach dem Aufstehen gemessen
+      const t = new Date(`${day}T08:00:00`).getTime();
+      await state.repo.addSamples([{ type: 'mass', t, e: t, v, src: 'Hand' }]);
+      await saveSettings({ ...state.repo.settings, profile: { ...state.repo.settings.profile, weightKg: v } });
+      recompute();
+      setKg('');
+      toast(`${num(v, 1)} kg für den ${dateShort(day)} gespeichert`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return html`<section class="card" aria-labelledby="h-weight">
+    <div class="card-head"><h2 id="h-weight">Gewicht</h2>${letzte ? html`<span class="tiny muted">zuletzt ${dateShort(letzte.date)}</span>` : null}</div>
+    <form class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end" onSubmit=${speichern}>
+      <label class="grow" style="min-width:120px">Gewicht
+        <input id="w-kg" class="field" type="text" inputmode="decimal" autocomplete="off" placeholder=${letzte ? num(letzte.kg, 1) : '78,0'}
+          value=${kg} onInput=${(e) => setKg(e.currentTarget.value)} />
+      </label>
+      <label style="min-width:140px">Tag
+        <input id="w-day" class="field" type="date" max=${todayKey()} value=${day} onInput=${(e) => setDay(e.currentTarget.value)} />
+      </label>
+      <button class="btn primary" type="submit" disabled=${busy}>Eintragen</button>
+    </form>
+    ${hat ? html`<div style="margin-top:12px">
+      <${TimeChart} label="Gewicht der letzten 90 Tage" dates=${window90} weekends=${false}
+        series=${[{ key: 'kg', label: 'Gewicht', values: line, color: 'var(--ink)' }]} fmt=${(v) => `${num(v, 1)} kg`} tickFmt=${(v) => num(v, 1)} height=${140} />
+      <div class="list" style="margin-top:8px">
+        <div class="list-row"><span class="t">Letzte Messung</span><span class="num">${num(letzte.kg, 1)} kg</span><span class="d">${dateShort(letzte.date)}</span></div>
+        ${isNum(trend) ? html`<div class="list-row"><span class="t">Letzte 30 Tage</span><span class="num">${trend > 0 ? '+' : '−'}${num(Math.abs(trend), 1)} kg</span>
+          <span class="d">Schnitt gegen die 30 Tage davor</span></div>` : null}
+        <div class="list-row"><span class="t">Messungen</span><span class="num">${num(points.length)}</span><span class="d">aus Health und von Hand</span></div>
+      </div>
+    </div>` : html`<p class="small muted" style="margin-top:10px">Noch keine Messung. Trage dein Gewicht ein, dann zeichnet die App den Verlauf – hier und im Reiter „Verlauf“. Eine Waage, die an Apple Health schreibt, füllt ihn von selbst.</p>`}
+  </section>`;
+}
+
 function ImportSettings() {
   const s = state.repo.settings;
   return html`<section class="card">
@@ -284,6 +404,38 @@ function DayPicker({ value, onChange, label }) {
     onClick=${() => onChange(value.includes(d) ? value.filter((x) => x !== d) : [...value, d].sort())}>${WEEKDAYS[d]}</button>`)}</div>`;
 }
 
+/** Welche Karten auf „Heute“ erscheinen. Karten ohne Daten lassen sich zusammen ausblenden. */
+function HomeCards() {
+  const s = state.repo.settings;
+  const rep = dataReport({ index: state.repo.index, results: state.results, settings: s, lastImport: state.lastImport, today: state.today });
+  const leer = new Set(emptyCards(rep));
+  const offen = HOME_CARDS.filter((c) => leer.has(c.id) && cardOn(s, c.id));
+  const alleAus = async () => {
+    let next = s;
+    for (const c of offen) next = withCard(next, c.id, false);
+    await saveSettings(next);
+    toast(`${offen.length} ${offen.length === 1 ? 'Karte' : 'Karten'} ausgeblendet`);
+  };
+  return html`<section class="card" aria-labelledby="h-cards">
+    <div class="card-head"><h2 id="h-cards">Karten auf „Heute“</h2></div>
+    <p class="small ink2" style="margin-bottom:8px">Was du nicht brauchst, blendest du hier aus. Die Tagesform und die Karten für Import, Check-in und Frühwarnungen bleiben immer.</p>
+    ${offen.length ? html`<div class="banner" style="margin-bottom:10px">
+      <${Icon} name="info" size=${18} />
+      <div class="grow stack-s">
+        <span><b>${offen.length} ${offen.length === 1 ? 'Karte hat' : 'Karten haben'} keine Daten:</b> ${offen.map((c) => c.label).join(', ')}.</span>
+        <button type="button" class="btn small" style="justify-self:start" onClick=${alleAus}>Diese ausblenden</button>
+      </div>
+    </div>` : null}
+    <div class="list">
+      ${HOME_CARDS.map((c) => html`<div class="list-row" key=${c.id}>
+        <span class="t">${c.label}</span>
+        <${Switch} id=${`card-${c.id}`} label=${c.label} checked=${cardOn(s, c.id)} onChange=${(v) => saveSettings(withCard(s, c.id, v))} />
+        <span class="d">${c.hint}${leer.has(c.id) ? ' · Zurzeit ohne Daten.' : ''}</span>
+      </div>`)}
+    </div>
+  </section>`;
+}
+
 function Preferences() {
   const s = state.repo.settings;
   const set = (path, v) => saveSettings(setPath(s, path, v));
@@ -292,10 +444,18 @@ function Preferences() {
     <div class="list">
       <div class="list-row"><span class="t">Erscheinungsbild</span><span></span>
         <div style="grid-column:1 / -1"><${Segmented} label="Erscheinungsbild" value=${s.display.theme} onChange=${(v) => set('display.theme', v)} options=${[{ value: 'auto', label: 'Auto' }, { value: 'dark', label: 'Dunkel' }, { value: 'light', label: 'Hell' }]} /></div></div>
+      <div class="list-row"><span class="t">Farben</span><span></span>
+        <div style="grid-column:1 / -1"><${Segmented} label="Farbvariante" value=${s.display.palette} onChange=${(v) => set('display.palette', v)}
+          options=${[{ value: 'rot', label: 'Rot' }, { value: 'schiefer', label: 'Schiefer' }]} /></div>
+        <span class="d">„Rot“ ist weiß mit Rottönen, „Schiefer“ das ruhige Nachtblau der ersten Versionen. Hell oder dunkel stellst du oben ein.</span></div>
       <div class="list-row"><span class="t">Scores erst nach dem Morgencheck</span><${Switch} id="gate" label="Scores erst nach dem Morgencheck" checked=${s.display.hideScoresUntilMorning} onChange=${(v) => set('display.hideScoresUntilMorning', v)} />
         <span class="d">Verhindert, dass die Zahl dein Gefühl beeinflusst.</span></div>
       <div class="list-row"><span class="t">Frühwarnungen auf „Heute“</span><${Switch} id="warn" label="Frühwarnungen" checked=${s.display.warnings} onChange=${(v) => set('display.warnings', v)} />
         <span class="d">Meldet dauerhafte Abweichungen bei Ruhepuls, HRV, Atemfrequenz, Blutsauerstoff, Schlafdauer und Stimmung. Grenzen unter „Modell und Gewichte“.</span></div>
+      <div class="list-row"><span class="t">Logbuch zählt zur Tagesform</span><${Switch} id="lifest" label="Logbuch zählt zur Tagesform" checked=${s.model.form.lifestyle.on} onChange=${(v) => set('model.form.lifestyle.on', v)} />
+        <span class="d">Alkohol, Koffein und Wasser des Vortags verschieben die Tagesform um höchstens ${num(s.model.form.lifestyle.cap)} Punkte nach unten und ${num(s.model.form.lifestyle.bonus)} nach oben. Die Gründe stehen unter „Was deine Werte bewegt“.</span></div>
+      <div class="list-row"><span class="t">Hinweis bei fehlenden Messwerten</span><${Switch} id="dchk" label="Hinweis bei fehlenden Messwerten" checked=${s.display.dataCheck} onChange=${(v) => set('display.dataCheck', v)} />
+        <span class="d">Meldet auf „Heute“, welche Werte nicht ankommen und welche Berechnungen dadurch ausfallen. Die ganze Prüfung steht unter „Daten importieren“.</span></div>
       <div class="list-row"><span class="t">Nikotin und Cannabis abfragen</span><${Switch} id="nic" label="Nikotin und Cannabis abfragen" checked=${s.survey.askNicotine} onChange=${(v) => set('survey.askNicotine', v)} /></div>
       <div class="list-row"><span class="t">Sensible Fragen</span><${Switch} id="sens" label="Sensible Fragen" checked=${s.survey.sensitive} onChange=${(v) => set('survey.sensitive', v)} />
         <span class="d">Zum Beispiel Intimität. Bleibt nur auf deinem Gerät.</span></div>
@@ -723,7 +883,7 @@ export function DataPage() {
         ${state.lastImport ? html`<hr class="divider" style="margin:4px 0" /><${ImportSummary} s=${state.lastImport} />` : null}
       </section>
       <${ShortcutGuide} />
-      <${Diagnose} />
+      <${DataCheck} />
       <${NightCheck} />
       <${Sources} />
       <${ImportSettings} />
@@ -732,10 +892,11 @@ export function DataPage() {
 
 export function BodyPage() {
   return html`
-    <${SubTopbar} title="Körperdaten" sub="Alter, Geschlecht, Größe, Gewicht" />
+    <${SubTopbar} title="Körperdaten" sub="Alter, Geschlecht, Größe, Gewichtsverlauf" />
     <main class="view">
       <${DemoBanner} />
       <${BodyData} />
+      <${WeightLog} />
     </main>`;
 }
 
@@ -751,10 +912,11 @@ export function EnvironmentPage() {
 
 export function SettingsPage() {
   return html`
-    <${SubTopbar} title="Einstellungen" sub="Anzeige, Check-in, Logbuch, Modell" />
+    <${SubTopbar} title="Einstellungen" sub="Farben, Karten, Check-in, Logbuch, Modell" />
     <main class="view">
       <${DemoBanner} />
       <${Preferences} />
+      <${HomeCards} />
       <${JournalSettings} settings=${state.repo.settings} />
       <${ModelParams} />
     </main>`;

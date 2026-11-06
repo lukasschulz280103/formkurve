@@ -22,7 +22,9 @@
   --weekend: rgba(57, 135, 229, 0.13);
   --focus: #9ec5f4;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --font: system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --accent: #eef2f6;
+  --accent-ink: #0c0f14;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --font-num: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --r-lg: 20px;
@@ -49,6 +51,8 @@
     --weekend: rgba(42, 120, 214, 0.1);
     --focus: #2a78d6;
     --shadow: 0 10px 30px rgba(20, 30, 50, 0.12);
+    --accent: #0d1117;
+    --accent-ink: #ffffff;
   }
 }
 :root[data-theme="light"] {
@@ -69,7 +73,90 @@
   --band: rgba(13, 17, 23, 0.06);
   --weekend: rgba(42, 120, 214, 0.1);
   --focus: #2a78d6;
+  --accent: #0d1117;
+  --accent-ink: #ffffff;
   --shadow: 0 10px 30px rgba(20, 30, 50, 0.12);
+}
+
+
+/* Farbvariante „Rot“: Weiß und Rottöne wie in der Design-Vorschau. Umschaltbar unter
+   Profil → Einstellungen → Farben. Dunkel ist der Grundzustand, hell steht darunter. */
+:root[data-palette="rot"] {
+  --bg: #110c0e;
+  --surface: #1c1518;
+  --surface-2: #241a1e;
+  --surface-3: #33242a;
+  --line: #35252a;
+  --axis: #4d363c;
+  --ink: #f8f0f2;
+  --ink-2: #cdb4ba;
+  --muted: #a3888f;
+  --strain: #ff7a5e;
+  --sleep: #e8558e;
+  --pos: #4fbf8b;
+  --neg: #ff5a72;
+  --good: #35b66f;
+  --warn: #f5a524;
+  --crit: #ff4a68;
+  --band: rgba(248, 240, 242, 0.07);
+  --weekend: rgba(255, 74, 104, 0.12);
+  --focus: #ff7d93;
+  --accent: #ff2d55;
+  --accent-ink: #ffffff;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --dial: #ff2d55;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-palette="rot"]:not([data-theme="dark"]) {
+    --bg: #fff8f9;
+    --surface: #ffffff;
+    --surface-2: #fff1f3;
+    --surface-3: #fbe3e8;
+    --line: #f3dde2;
+    --axis: #e0c3ca;
+    --ink: #1a1416;
+    --ink-2: #5d484e;
+    --muted: #7b6a6f;
+    --strain: #ff5a3c;
+    --sleep: #b4245b;
+    --pos: #1f9d62;
+    --neg: #d7263d;
+    --good: #1f9d62;
+    --warn: #c9820a;
+    --crit: #d7263d;
+    --band: rgba(26, 20, 22, 0.06);
+    --weekend: rgba(255, 45, 85, 0.09);
+    --focus: #ff2d55;
+    --accent: #ff2d55;
+    --accent-ink: #ffffff;
+    --shadow: 0 10px 30px rgba(140, 30, 55, 0.12);
+    --dial: #ff2d55;
+  }
+}
+:root[data-palette="rot"][data-theme="light"] {
+  --bg: #fff8f9;
+  --surface: #ffffff;
+  --surface-2: #fff1f3;
+  --surface-3: #fbe3e8;
+  --line: #f3dde2;
+  --axis: #e0c3ca;
+  --ink: #1a1416;
+  --ink-2: #5d484e;
+  --muted: #7b6a6f;
+  --strain: #ff5a3c;
+  --sleep: #b4245b;
+  --pos: #1f9d62;
+  --neg: #d7263d;
+  --good: #1f9d62;
+  --warn: #c9820a;
+  --crit: #d7263d;
+  --band: rgba(26, 20, 22, 0.06);
+  --weekend: rgba(255, 45, 85, 0.09);
+  --focus: #ff2d55;
+  --accent: #ff2d55;
+  --accent-ink: #ffffff;
+  --shadow: 0 10px 30px rgba(140, 30, 55, 0.12);
+  --dial: #ff2d55;
 }
 
 * { box-sizing: border-box; }
@@ -246,7 +333,7 @@ a { color: inherit; }
   font-size: 15px;
   text-decoration: none;
 }
-.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .btn.ghost { background: transparent; }
 .btn.danger { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 45%, var(--line)); background: transparent; }
 .btn.small { min-height: 36px; padding: 6px 12px; font-size: 14px; border-radius: 11px; }
@@ -282,8 +369,8 @@ a { color: inherit; }
 .dial .track { stroke: var(--surface-3); }
 .dial .tick { stroke: var(--axis); }
 .dial .tick.major { stroke: var(--muted); }
-.dial .value { stroke: var(--ink); }
-.dial .dot { fill: var(--ink); stroke: var(--bg); stroke-width: 3; }
+.dial .value { stroke: var(--dial, var(--ink)); }
+.dial .dot { fill: var(--dial, var(--ink)); stroke: var(--bg); stroke-width: 3; }
 .dial-num { font-family: var(--font-num); font-weight: 650; font-size: 60px; letter-spacing: -0.02em; fill: var(--ink); }
 .dial-label { font-size: 12px; font-weight: 650; letter-spacing: 0.12em; fill: var(--muted); }
 .dial-scale { font-size: 10px; fill: var(--muted); font-family: var(--font-num); }
@@ -581,6 +668,15 @@ details.more[open] > summary .icon { transform: rotate(180deg); }
 .typegrid .h { color: var(--muted); font-size: 12px; }
 .ok { color: var(--good); }
 .bad { color: var(--crit); }
+.warn-ink { color: var(--warn); }
+
+/* Datenprüfung: je Messwert Zustand und Folge */
+.dcheck { list-style: none; margin: 0; padding: 0; display: grid; }
+.dcheck > li { display: flex; gap: 9px; align-items: flex-start; padding: 9px 0; border-top: 1px solid var(--line); }
+.dcheck > li:first-child { border-top: 0; padding-top: 0; }
+.dcheck .s { flex: none; margin-top: 1px; line-height: 0; }
+.dcheck b { font-weight: 650; }
+.dcheck .why { color: var(--ink-2); }
 .empty { text-align: center; padding: 28px 12px; display: grid; gap: 12px; justify-items: center; }
 .empty h2 { font-size: 20px; }
 
@@ -773,9 +869,13 @@ ul.sources a { color: var(--ink-2); text-underline-offset: 3px; overflow-wrap: a
 .sync-state .dot.good { background: var(--good); }
 .sync-state .dot.warn { background: var(--warn); }
 .sync-state .dot.crit { background: var(--crit); }
-.sync-state .dot.info { background: var(--accent, #3987e5); }
+.sync-state .dot.info { background: var(--pos); }
 pre.codeblock { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-sm, 8px); padding: 10px 12px; margin: 0; color: var(--ink); }
 .banner.sync { border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); }
+.banner.data.warn { border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); }
+.banner.data.error { border-color: color-mix(in srgb, var(--crit) 45%, var(--line)); }
+.banner.data .icon { color: var(--ink-2); }
+.banner.data.error .icon { color: var(--crit); }
 
 /* Logbuch */
 .j-card { display: grid; gap: 10px; }
@@ -845,8 +945,8 @@ pre.codeblock { font-family: var(--font-mono); font-size: 11.5px; line-height: 1
   padding: 0 16px;
   border: 0;
   border-radius: 28px;
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--accent);
+  color: var(--accent-ink);
   font-weight: 700;
   font-size: 15px;
   box-shadow: var(--shadow);

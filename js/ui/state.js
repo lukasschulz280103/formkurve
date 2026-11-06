@@ -143,6 +143,9 @@ export function applyTheme() {
   if (t === 'dark' || t === 'light') root.setAttribute('data-theme', t);
   else if (state.hostTheme) root.setAttribute('data-theme', state.hostTheme);
   else root.removeAttribute('data-theme');
+  const p = state.repo?.settings?.display?.palette || 'rot';
+  if (p === 'schiefer') root.removeAttribute('data-palette');
+  else root.setAttribute('data-palette', p);
 }
 
 export function recompute() {

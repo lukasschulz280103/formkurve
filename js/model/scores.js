@@ -1,5 +1,5 @@
 // Reine Rechenfunktionen der Scores (Abschnitte 3 bis 5 des Konzepts). Keine Seiteneffekte.
-import { isNum, clamp, sigmoid, weightedMean, linmap, median, mad, sd } from '../core/stats.js';
+import { isNum, clamp, sigmoid, weightedMean, linmap, median, mad, sd, mean } from '../core/stats.js';
 
 /** Robuster z-Wert gegen eine Baseline {median, mad}. floor verhindert Division durch ~0. */
 export function zScore(x, base, floor) {
@@ -66,12 +66,23 @@ export function strengthLoad(durMin, rpe, factor = 0.4, share = 1) {
  * gegenüber dem Grundbedarf (Basis + Strain-Zuschlag), damit sich die Schuld nicht selbst aufschaukelt.
  * Liefert { need, core } mit core = Grundbedarf ohne Schuld und Nickerchen.
  */
-export function sleepNeedParts({ base = 8, strainPrev = null, debtsH = [], napMinPrev = 0 }, p) {
-  const strainAdj = isNum(strainPrev) ? Math.max(0, strainPrev - p.strainNeedFrom) * p.strainNeedPerPoint : 0;
+export function sleepNeedParts({ base = 8, strainPrev = null, strainPrev2 = null, recoveries = [], debtsH = [], napMinPrev = 0 }, p) {
+  const ofStrain = (v) => (isNum(v) ? Math.max(0, v - p.strainNeedFrom) * p.strainNeedPerPoint : 0);
+  // Der Vortag zählt voll, der Tag davor anteilig: harte Tage wirken über mehr als eine Nacht nach
+  const strainAdj = ofStrain(strainPrev) + p.strainPrev2Weight * ofStrain(strainPrev2);
   const debtAdj = p.debtFactor * debtsH.filter(isNum).reduce((s, x) => s + Math.max(0, x), 0);
-  const extra = Math.min(p.extraCap, strainAdj + debtAdj);
+  // Schwache Erholung in den Vornächten hebt den Bedarf zusätzlich
+  const recs = recoveries.filter(isNum).slice(0, p.recNights);
+  const recAdj = recs.length ? Math.max(0, p.recNeedFrom - mean(recs)) * p.recNeedPerPoint : 0;
   const nap = Math.min(p.napCap, Math.max(0, napMinPrev || 0) / 60);
-  return { need: Math.max(4, base + extra - nap), core: base + Math.min(p.extraCap, strainAdj) };
+  const extra = Math.min(p.extraCap, strainAdj + debtAdj + recAdj);
+  // Anteile einzeln, damit die App den Bedarf erklären kann; zusammen nie mehr als die Deckelung
+  const scale = strainAdj + debtAdj + recAdj > 0 ? extra / (strainAdj + debtAdj + recAdj) : 0;
+  return {
+    need: Math.max(4, base + extra - nap),
+    core: base + Math.min(p.extraCap, strainAdj),
+    parts: { base, strain: strainAdj * scale, debt: debtAdj * scale, recovery: recAdj * scale, nap: -nap },
+  };
 }
 
 export function sleepNeed(args, p) {
@@ -85,7 +96,18 @@ export function regularityScore(onsets, wakes, p) {
   return linmap(avg, p.regBad, p.regGood);
 }
 
-export function sleepScore({ asleepMin, needH, efficiency, restorativePct, regularity }, p) {
+/**
+ * Wie ruhig der Körper in der Nacht war: HRV über und Ruhepuls unter der eigenen Baseline.
+ * Damit zählt im Schlaf-Score nicht nur, wie lange und wie durchgehend geschlafen wurde,
+ * sondern auch, ob die Nacht tatsächlich erholsam war. Ohne Baseline bleibt der Teil leer.
+ */
+export function calmScore({ hrv = null, rhr = null }, p) {
+  const z = weightedMean([[hrv, 1], [isNum(rhr) ? -rhr : null, 1]]);
+  if (!isNum(z)) return null;
+  return linmap(z, p.calmLow, p.calmHigh);
+}
+
+export function sleepScore({ asleepMin, needH, efficiency, restorativePct, regularity, calm = null }, p) {
   if (!isNum(asleepMin) || asleepMin <= 0) return { score: null, parts: {} };
   const ratio = asleepMin / 60 / needH;
   const parts = {
@@ -93,12 +115,14 @@ export function sleepScore({ asleepMin, needH, efficiency, restorativePct, regul
     efficiency: linmap(efficiency, p.effLow, p.effHigh),
     stages: isNum(restorativePct) ? linmap(restorativePct, p.stageLow, p.stageHigh) : null,
     regularity: isNum(regularity) ? regularity : null,
+    calm: isNum(calm) ? calm : null,
   };
   const score = weightedMean([
     [parts.duration, p.wDuration],
     [parts.efficiency, p.wEfficiency],
     [parts.stages, p.wStages],
     [parts.regularity, p.wRegularity],
+    [parts.calm, p.wCalm],
   ]);
   return { score, parts };
 }

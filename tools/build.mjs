@@ -39,7 +39,7 @@ writeFileSync(join(dist, 'formkurve-vorschau.html'), preview);
 // Die Dateien liegen direkt in der obersten Ebene des ZIP, ohne zusätzlichen Ordner.
 // GitHub Pages braucht index.html ganz oben im Repository, sonst kommt „404 File not found“.
 const { APP_VERSION } = await import(new URL('../js/version.js', import.meta.url));
-const include = ['index.html', 'manifest.webmanifest', 'sw.js', '.nojekyll', 'README.md', 'KURZBEFEHL.md', 'package.json', 'css', 'js', 'icons', 'test', 'tools'];
+const include = ['index.html', 'manifest.webmanifest', 'sw.js', '.nojekyll', 'README.md', 'KURZBEFEHL.md', 'package.json', 'css', 'js', 'icons', 'test', 'tools', 'design'];
 const files = {};
 function add(p) {
   const abs = join(root, p);

@@ -3,12 +3,13 @@
 import { Unzip, UnzipInflate } from '../vendor/fflate.js';
 import { parseLooseDate } from '../core/time.js';
 import { typeFromHK, normalizeValue, decodeEntities, workoutKind } from '../data/normalize.js';
+import { countReject } from './shortcut.js';
 
 /** Scanner für den XML-Text: erkennt <Record>, <Workout> und <WorkoutStatistics>. */
 export function createXmlScanner({ sinceMs = 0, onSample, onWorkout }) {
   let buf = '';
   let workout = null;
-  const stats = { records: 0, used: 0, old: 0, implausible: 0, workouts: 0, byType: {}, sources: {}, minT: null, maxT: null };
+  const stats = { records: 0, used: 0, old: 0, implausible: 0, workouts: 0, byType: {}, rejected: {}, sources: {}, minT: null, maxT: null };
 
   function attr(b, lt, gt, name) {
     const key = ' ' + name + '="';
@@ -31,9 +32,11 @@ export function createXmlScanner({ sinceMs = 0, onSample, onWorkout }) {
     }
     let e = parseLooseDate(attr(b, lt, gt, 'endDate'));
     if (!(e >= t)) e = t;
-    const v = normalizeValue(type, attr(b, lt, gt, 'value'), attr(b, lt, gt, 'unit'));
+    const info = {};
+    const v = normalizeValue(type, attr(b, lt, gt, 'value'), attr(b, lt, gt, 'unit'), info);
     if (!Number.isFinite(v)) {
       stats.implausible++;
+      countReject(stats, type, info.reason || 'nan');
       return;
     }
     const src = decodeEntities(attr(b, lt, gt, 'sourceName') || 'Unbekannt');
