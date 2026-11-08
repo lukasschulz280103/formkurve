@@ -11,6 +11,8 @@ import { addDays } from '../core/time.js';
 import { summarize, formGap } from '../model/hints.js';
 import { cardOn, withCard } from './cards.js';
 import { explainNight } from '../model/lifestyle.js';
+import { DetectCard, WorkoutSheet } from './workouts.js';
+import { sportLabel } from '../model/sports.js';
 import { earlyWarnings, snoozedWarnings, snoozeWarning } from '../model/earlywarning.js';
 import { dataReport, dataAlert } from '../model/coverage.js';
 import { slotDone } from '../survey/engine.js';
@@ -354,6 +356,7 @@ function Environment({ date }) {
 export function TodayView() {
   const settings = state.repo.settings;
   const vis = (id) => cardOn(settings, id);
+  const [openWk, setOpenWk] = useState(null);
   const date = state.date;
   const d = state.results.days.get(date);
   const prev = state.results.days.get(addDays(date, -1));
@@ -467,6 +470,12 @@ export function TodayView() {
           <div class="card-head"><h2>Was deine Werte bewegt</h2><span class="tiny muted">Punkte</span></div>
           ${contrib.length ? html`<${Contributions} items=${contrib} />
           <p class="tiny muted" style="margin-top:10px">Recovery gegenüber einem Tag, an dem alles genau deinem Normalwert entspricht (Recovery 50).</p>` : null}
+          ${d.formParts?.length ? html`<hr class="divider" />
+            <div class="card-head" style="margin-bottom:6px"><h3 style="font-size:15px;margin:0">Woraus die Tagesform entsteht</h3><span class="tnum small muted">${num(d.formRaw)}</span></div>
+            <dl class="kv">
+              ${d.formParts.filter((x) => x.value != null).map((x) => html`<dt key=${`t${x.id}`}>${x.label} <span class="muted">${num(x.weight * 100)} %</span></dt><dd key=${`v${x.id}`}>${num(x.value)}</dd>`)}
+            </dl>
+            ${d.formCap != null ? html`<p class="small warn-ink" style="margin-top:6px">Gedeckelt auf ${num(d.formCap)}: Bei einer Recovery von ${num(d.recovery)} sollen Fitness und Belastungsbalance den Tag nicht hochziehen.</p>` : null}` : null}
           ${d.lifestyle?.reasons?.length ? html`<hr class="divider" />
             <div class="card-head" style="margin-bottom:6px"><h3 style="font-size:15px;margin:0">Dazu aus dem Logbuch</h3>
               <span class="tnum small" style=${`color:var(--${d.lifestyle.delta < 0 ? 'crit' : 'good'})`}>${d.lifestyle.delta > 0 ? '+' : d.lifestyle.delta < 0 ? '−' : ''}${num(Math.abs(d.lifestyle.delta))} auf die Tagesform</span></div>
@@ -513,6 +522,7 @@ export function TodayView() {
           ${d.sleepParts?.calm != null && d.sleepScore >= 70 && d.sleepParts.calm <= 45 ? html`<p class="small ink2" style="margin-top:8px">
             Lang und durchgehend geschlafen, aber unruhig: Puls und HRV lagen schlechter als sonst. Deshalb kann der Schlaf-Score hoch und die Recovery trotzdem niedrig sein.</p>` : null}
         </section>` : null}
+        ${vis('detect') ? html`<${DetectCard} date=${date} />` : null}
         ${vis('load') ? html`<section class="card">
           <div class="card-head"><h2>Belastung</h2></div>
           <dl class="kv">
@@ -526,14 +536,17 @@ export function TodayView() {
             ${vo2 != null ? html`<${KV} label="VO₂max (Schätzung)" value=${html`${num(vo2, 1)}${vo2Date !== date ? html` <span class="tiny muted">· ${dayLabel(vo2Date, state.today)}</span>` : null}`} k="vo2" infoValue=${vo2} />` : null}
             ${d.fitness != null ? html`<${KV} label="Langzeit-Fitness" value=${num(d.fitness)} k="fitness" infoValue=${d.fitness} />` : null}
           </dl>
-          ${d.workouts?.length ? html`<hr class="divider" />${d.workouts.map((w) => html`<div class="row between small" style="padding:4px 0">
-            <span><b>${WORKOUT_LABEL[w.kind] || 'Training'}</b> <span class="muted">${clock(w.t)} · ${num(w.durMin)} min</span></span>
-            <span class="muted tnum">${[w.kcal > 0 ? `${num(w.kcal)} kcal` : '', w.avgHr ? `Ø ${num(w.avgHr)} bpm` : ''].filter(Boolean).join(' · ')}</span></div>`)}` : null}
+          ${d.workouts?.length ? html`<hr class="divider" />${d.workouts.map((w, i) => html`<button type="button" class="wk-row small" key=${i} onClick=${() => setOpenWk(w)}>
+            <span><b>${sportLabel(w.sport || w.kind) || WORKOUT_LABEL[w.kind] || 'Training'}</b> <span class="muted">${clock(w.t)} · ${num(w.durMin)} min</span></span>
+            <span class="muted tnum row" style="gap:6px">${[w.kcal > 0 ? `${num(w.kcal)} kcal` : '', w.avgHr ? `Ø ${num(w.avgHr)} bpm` : ''].filter(Boolean).join(' · ')}
+              <${Icon} name="right" size=${15} /></span></button>`)}
+            <p class="tiny muted" style="margin-top:6px">Tippe auf eine Einheit für die Zusammenfassung.</p>` : null}
           ${d.energy != null ? html`<p class="tiny muted" style="margin-top:8px">Aktive Energie ohne Grundumsatz, so wie Apple Health sie zählt.</p>` : null}
           ${d.load == null && !d.workouts?.length ? html`<p class="small muted">Keine Pulsdaten für diesen Tag. <${HideCard} id="load" /></p>` : null}
         </section>` : null}
         ${vis('environment') ? html`<${Environment} date=${date} />` : null}
       ` : null}
       ${hasAny && !d ? html`<section class="card"><p class="muted">Für diesen Tag gibt es keine Daten.</p></section>` : null}
+      ${openWk ? html`<${WorkoutSheet} item=${openWk} date=${date} onClose=${() => setOpenWk(null)} />` : null}
     </main>`;
 }

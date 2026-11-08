@@ -37,13 +37,14 @@ test('Karten ohne Daten erkennt die App aus dem Datenbericht', () => {
   assert.deepEqual(emptyCards(ohneSchlaf), ['sleep']);
   // Fehlen alle Nachtwerte, auch die Karte „Letzte Nacht“ – Belastung lebt noch von Schritten
   const ohneNacht = { rows: alles.rows.map((r) => (['hrv', 'hr', 'rhr', 'resp', 'spo2', 'wtemp'].includes(r.type) ? row(r.type, 'none') : r)) };
-  assert.deepEqual(emptyCards(ohneNacht), ['night']);
+  assert.deepEqual(emptyCards(ohneNacht).sort(), ['detect', 'night'], 'ohne Puls fragt auch die Erkennung nichts mehr');
   const ohneAlles = { rows: alles.rows.map((r) => row(r.type, 'none')) };
-  assert.deepEqual(emptyCards(ohneAlles).sort(), ['load', 'night', 'sleep']);
+  assert.deepEqual(emptyCards(ohneAlles).sort(), ['detect', 'load', 'night', 'sleep']);
   // Ein einziger vorhandener Wert reicht, damit die Karte etwas zeigt
   const nurPuls = { rows: alles.rows.map((r) => (r.type === 'hr' ? row('hr', 'ok') : row(r.type, 'none'))) };
   assert.ok(!emptyCards(nurPuls).includes('night'));
   assert.ok(!emptyCards(nurPuls).includes('load'));
+  assert.ok(!emptyCards(nurPuls).includes('detect'), 'die Erkennung braucht nur den Puls');
   // Ohne Bericht gibt es keine Empfehlung
   assert.deepEqual(emptyCards(null), []);
   // Karten ohne Messwerte stehen nie auf der Liste

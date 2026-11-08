@@ -207,12 +207,16 @@ export function formScore({ r = [], s = [], balance = null, fitness = null }, p)
   const rEff = weightedMean(r.map((v, i) => [v, lag[i]]));
   const sEff = weightedMean(s.map((v, i) => [v, lag[i]]));
   // Ohne Recovery für den Tag (z. B. in den ersten Nächten ohne Baseline) gibt es keine Tagesform.
-  if (!isNum(r[0])) return { score: null, rEff, sEff };
-  const score = weightedMean([
-    [rEff, p.wR],
-    [sEff, p.wS],
-    [balance, p.wB],
-    [fitness, p.wF],
-  ]);
-  return { score, rEff, sEff };
+  if (!isNum(r[0])) return { score: null, rEff, sEff, parts: [], cap: null };
+  const parts = [
+    { id: 'recovery', label: 'Recovery', value: rEff, weight: p.wR },
+    { id: 'sleep', label: 'Schlaf', value: sEff, weight: p.wS },
+    { id: 'balance', label: 'Belastungsbalance', value: balance, weight: p.wB },
+    { id: 'fitness', label: 'Langzeit-Fitness', value: fitness, weight: p.wF },
+  ];
+  const raw = weightedMean(parts.map((x) => [x.value, x.weight]));
+  // Eine schlechte Nacht deckelt den Tag: langsame Teile sollen sie nicht überstimmen
+  const cap = isNum(raw) && r[0] < p.capFrom ? r[0] + p.capAdd : null;
+  const score = isNum(cap) ? Math.min(raw, cap) : raw;
+  return { score, raw, rEff, sEff, parts, cap: isNum(cap) && cap < raw ? cap : null };
 }

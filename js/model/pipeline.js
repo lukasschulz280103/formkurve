@@ -261,6 +261,11 @@ export function computeAll({ index, workouts = [], survey = new Map(), journal =
         }
       }
       const reg = regularityScore(onsets, wakes, m.sleep);
+      // Wie weit das Zubettgehen von den Nächten davor abweicht, in Stunden nach hinten
+      if (onsets.length >= 4) {
+        const ref = median(onsets.slice(1));
+        d.sleepShiftH = Math.max(0, (onsets[0] - ref) / 60);
+      }
       const calm = calmScore({ hrv: d.z.hrv, rhr: d.z.rhr }, m.sleep);
       const ss = sleepScore({ asleepMin: d.sleep.asleepMin, needH: d.sleepNeedH, efficiency: d.sleep.efficiency, restorativePct: d.sleep.restorativePct, regularity: reg, calm }, m.sleep);
       d.sleepScore = ss.score;
@@ -333,6 +338,9 @@ export function computeAll({ index, workouts = [], survey = new Map(), journal =
     // Logbuch-Zuschlag: klein, gedeckelt und mit Begründung, siehe model/lifestyle.js
     d.lifestyle = lifestyleAdjust({ day: d, prev: p1, settings });
     d.formBase = fs.score;
+    d.formParts = fs.parts;
+    d.formRaw = fs.raw;
+    d.formCap = fs.cap;
     d.form = isNum(fs.score) ? Math.max(0, Math.min(100, fs.score + d.lifestyle.delta)) : fs.score;
     d.rEff = fs.rEff;
     d.sEff = fs.sEff;

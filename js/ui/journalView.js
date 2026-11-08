@@ -13,6 +13,8 @@ import { hrMaxOf } from '../core/config.js';
 import { median } from '../core/stats.js';
 import { weekStart, isoWeek } from '../model/periods.js';
 import * as J from '../journal/journal.js';
+import { SportPicker } from './workouts.js';
+import { coarseKind, sportLabel } from '../model/sports.js';
 
 // ---------- Formatierung ----------
 
@@ -32,7 +34,7 @@ const PROMPTS = ['Was war heute gut?', 'Was hat dich heute beschäftigt?', 'Wof�
 function entryText(x) {
   if (x.type === 'water') return liters(x.ml);
   if (x.type === 'caffeine') return `${J.CAFFEINE_BY_ID[x.kind]?.label || 'Koffein'} · ${num(x.mg)} mg`;
-  return `${J.SPORT_BY_ID[x.kind]?.label || 'Sport'} · ${num(x.min)} min${x.rpe != null ? ` · Anstrengung ${x.rpe}` : ''}`;
+  return `${sportLabel(x.sport || x.kind)} · ${num(x.min)} min${x.rpe != null ? ` · Anstrengung ${x.rpe}` : ''}`;
 }
 
 /** Tag, den das Logbuch gerade zeigt (nie in der Zukunft). */
@@ -132,7 +134,7 @@ function EntryEditor({ date, entry, onClose }) {
       ${J.CAFFEINE_KINDS.map((k) => html`<button type="button" class="chip small" aria-pressed=${draft.kind === k.id ? 'true' : 'false'} onClick=${() => set({ kind: k.id, mg: draft.kind === k.id ? draft.mg : k.mg })}>${k.label}</button>`)}
     </div>` : null}
     ${t === 'sport' ? html`<div class="chips" role="group" aria-label="Art">
-      ${J.SPORT_KINDS.map((k) => html`<button type="button" class="chip small" aria-pressed=${draft.kind === k.id ? 'true' : 'false'} onClick=${() => set({ kind: k.id })}>${k.label}</button>`)}
+      <${SportPicker} id="j-sport" value=${draft.sport || draft.kind} onChange=${(v) => set({ sport: v, kind: coarseKind(v) })} top=${['kraft', 'laufen', 'fussball', 'radfahren']} />
     </div>` : null}
     <div class="j-edit-row">
       <label class="field-label" style="font-weight:600">Uhrzeit<${TimeField} value=${draft.at} onChange=${(at) => set({ at })} /></label>
@@ -307,7 +309,7 @@ function SportCard({ date, rec, settings }) {
   const measured = sessions.filter((s) => s.src === 'health');
   const health = (state.results.days.get(date)?.workouts || []).map((w, i) => {
     const s = measured[i];
-    return { time: new Date(w.t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }), text: `${J.SPORT_BY_ID[w.kind]?.label || 'Training'} · ${num(w.durMin)} min${s?.rpe != null ? ` · Anstrengung ${s.rpe}` : ''}`, note: 'gemessen' };
+    return { time: new Date(w.t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }), text: `${sportLabel(w.sport || w.kind)} · ${num(w.durMin)} min${s?.rpe != null ? ` · Anstrengung ${s.rpe}` : ''}`, note: 'gemessen' };
   });
   const dayMin = J.sum(sessions, 'min');
   const blank = { type: 'sport', kind: 'kraft', min: 45, at: defaultAt(date, '18:00') };

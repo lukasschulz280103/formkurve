@@ -11,13 +11,29 @@ import { SLEEP } from '../js/data/normalize.js';
 const M = DEFAULTS.model;
 const near = (a, b, tol = 0.6) => assert.ok(Math.abs(a - b) <= tol, `${a} != ${b}`);
 
-test('Rechenbeispiel aus dem Konzept: Tagesform 75 -> 58', () => {
+test('Tagesform: der heutige Tag wiegt am schwersten', () => {
   const good = formScore({ r: [75, 75, 75], s: [80, 80, 80], balance: 80, fitness: 60 }, M.form);
-  near(good.score, 75);
+  near(good.score, 74.5);
+  assert.equal(good.cap, null);
   const bad = formScore({ r: [20, 70, 75], s: [50, 80, 80], balance: 80, fitness: 60 }, M.form);
-  near(bad.rEff, 46, 0.01);
-  near(bad.sEff, 65, 0.01);
-  near(bad.score, 58);
+  near(bad.rEff, 40.75, 0.01);
+  near(bad.sEff, 62, 0.01);
+  // Ohne Deckel käme hier 52,9 heraus – Fitness und Balance würden die Nacht überstimmen
+  near(bad.raw, 52.875, 0.01);
+  near(bad.score, 35);
+  assert.equal(bad.cap, 35);
+});
+
+test('Tagesform: der Deckel greift nur bei schwacher Recovery', () => {
+  const mittel = formScore({ r: [45, 45, 45], s: [60, 60, 60], balance: 100, fitness: 70 }, M.form);
+  assert.equal(mittel.cap, null, 'ab Recovery 40 kein Deckel');
+  // Gute Fitness und perfekte Balance heben einen Katertag nicht mehr an
+  const kater = formScore({ r: [18, 60, 70], s: [55, 75, 75], balance: 100, fitness: 85 }, M.form);
+  near(kater.score, 33);
+  assert.ok(kater.raw > kater.score + 15, 'der Deckel zieht deutlich');
+  // Die Anteile stehen für die Erklärung bereit
+  assert.deepEqual(kater.parts.map((x) => x.id), ['recovery', 'sleep', 'balance', 'fitness']);
+  near(kater.parts[0].weight, M.form.wR);
 });
 
 test('Strain mit Kraft-Zuschlag: 68 statt 30', () => {

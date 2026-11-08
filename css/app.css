@@ -1105,3 +1105,18 @@ button.card { -webkit-appearance: none; appearance: none; width: 100%; font: inh
 .warncard { border-color: color-mix(in srgb, var(--warn) 40%, var(--line)); }
 .warncard .hint p { margin-top: 2px; }
 .warncard .adv b { display: inline; }
+
+/* Sport: erkannte Abschnitte und die Zusammenfassung einer Einheit */
+.cand { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: var(--surface-2); }
+.cand + .cand { margin-top: 10px; }
+.cand select.field, .cand input.field { margin-top: 2px; }
+.zonebar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--surface-3); margin-top: 6px; }
+.zonebar span { display: block; min-width: 2px; }
+.zonebar .z0 { background: color-mix(in srgb, var(--strain) 22%, transparent); }
+.zonebar .z1 { background: color-mix(in srgb, var(--strain) 38%, transparent); }
+.zonebar .z2 { background: color-mix(in srgb, var(--strain) 55%, transparent); }
+.zonebar .z3 { background: color-mix(in srgb, var(--strain) 72%, transparent); }
+.zonebar .z4 { background: color-mix(in srgb, var(--strain) 88%, transparent); }
+.zonebar .z5 { background: var(--strain); }
+.wk-row { width: 100%; display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 8px 0; background: none; border: 0; border-top: 1px solid var(--line); text-align: left; cursor: pointer; }
+.wk-row:first-of-type { border-top: 0; }

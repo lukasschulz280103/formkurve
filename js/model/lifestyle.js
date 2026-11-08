@@ -54,6 +54,14 @@ export function lifestyleAdjust({ day, prev, settings }) {
     add('koffein-spaet', -p.caffeineLate, `Letztes Koffein gestern um ${String(Math.floor(last % 24)).padStart(2, '0')} Uhr`);
   }
 
+  // Verschobener Schlafrhythmus: um 5 Uhr ins Bett ist etwas anderes als früh schlafen gehen
+  const shift = day?.sleepShiftH;
+  if (isNum(shift) && shift >= p.shiftSmall) {
+    const big = shift >= p.shiftBig;
+    add('rhythmus', -(big ? p.shiftBigPts : p.shiftSmallPts),
+      `Schlaf ${shift.toFixed(1).replace('.', ',')} h später als sonst`);
+  }
+
   const sum = reasons.reduce((s, r) => s + r.points, 0);
   const delta = Math.max(-p.cap, Math.min(p.bonus, sum));
   return { delta, reasons };
@@ -94,6 +102,15 @@ export function nightDisturbances(day, prev, settings) {
       cause: 'spätem Koffein am Abend',
       affects: ['hrv'],
       text: `Letztes Koffein gestern um ${String(Math.floor(late % 24)).padStart(2, '0')} Uhr. Das verzögert den Tiefschlaf und dämpft die HRV der ersten Nachthälfte.`,
+    });
+  }
+  if (isNum(day?.sleepShiftH) && day.sleepShiftH >= (settings?.model?.form?.lifestyle?.shiftBig ?? 3)) {
+    out.push({
+      id: 'rhythmus',
+      label: 'Stark verschobener Rhythmus',
+      cause: 'dem verschobenen Schlafrhythmus',
+      affects: ['rhr', 'hrv'],
+      text: `Du bist ${day.sleepShiftH.toFixed(1).replace('.', ',')} h später schlafen gegangen als sonst. Das allein hebt den Ruhepuls und senkt die HRV.`,
     });
   }
   if (day?.sleep && day.sleep.asleepMin < 5 * 60) {

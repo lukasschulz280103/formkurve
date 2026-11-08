@@ -53,6 +53,11 @@ export const DEFAULTS = {
     },
     balance: { lo: 0.8, hi: 1.3, minDays: 14 },
     // Frühwarnungen: Startwerte aus dem Konzept, alle einstellbar
+    // Erkennung von Sport aus dem Puls
+    detect: {
+      on: true,
+      overRhr: 30, ofMax: 0.55, gapMin: 5, minMin: 12, nearMin: 12,
+    },
     warn: {
       z: 1.5, // Abweichung von der eigenen Baseline, ab der ein Nachtwert auffällt
       nights: 2, // so viele Nächte nacheinander
@@ -78,7 +83,11 @@ export const DEFAULTS = {
       wRhr: 0.3, wHrv: 0.2, wActive: 0.3, wRegular: 0.1, wVo2: 0.1,
     },
     form: {
-      wR: 0.45, wS: 0.25, wB: 0.15, wF: 0.15, lag0: 0.5, lag1: 0.3, lag2: 0.2,
+      wR: 0.5, wS: 0.25, wB: 0.1, wF: 0.15, lag0: 0.6, lag1: 0.25, lag2: 0.15,
+      // Deckel: Liegt die Recovery heute unter capFrom, kann die Tagesform höchstens
+      // capAdd darüber liegen. Sonst tragen Fitness und Belastungsbalance über eine
+      // zerstörte Nacht hinweg, und ein Katertag sieht besser aus als ein normaler.
+      capFrom: 40, capAdd: 15,
       // Zuschlag aus dem Logbuch, in Punkten der Tagesform. Klein und gedeckelt, weil
       // Alkohol, Koffein und Wasser zum Teil schon in HRV, Puls und Schlaf stecken.
       lifestyle: {
@@ -87,6 +96,7 @@ export const DEFAULTS = {
         water: 2, waterFrac: 0.6, waterGood: 0.9,
         caffeineHigh: 1, highMg: 400,
         caffeineLate: 2, lateHour: 17,
+        shiftSmall: 1.5, shiftBig: 3, shiftSmallPts: 2, shiftBigPts: 4,
         bonus: 1, cap: 6,
       },
     },
@@ -97,6 +107,7 @@ export const DEFAULTS = {
     nutritionDays: [2, 5], // Ernährungsfragen rücken an diesen Tagen nach vorn (Di, Fr)
     stressDays: [1, 3, 5], // Stressfragen rücken an diesen Tagen nach vorn (Mo, Mi, Fr)
     weeklyDay: 0, // Wochenrückblick (So)
+    askPrivate: true, // „Intimität“ in der Sportauswahl anbieten
     askNicotine: false,
     sensitive: false,
     backfillDays: 3,
@@ -112,10 +123,16 @@ export const DEFAULTS = {
   },
   analysis: { minN: 10, permutations: 2000, bootstrap: 1000, qThreshold: 0.1 },
   context: { enabled: false, auto: false, place: null },
+  // Was die App aus eigenen Einträgen gelernt hat. Wächst mit jedem bestätigten Sport.
+  learned: {
+    sport: { v: 1, byId: {}, n: 0 },
+    notSport: [],
+  },
 };
 
-/** Parameter, die im Einstellungs-Editor angezeigt werden. */
 export const PARAMS = [
+/** Parameter, die im Einstellungs-Editor angezeigt werden. */
+
   { group: 'Recovery', path: 'model.recovery.wHrv', label: 'Gewicht HRV', min: 0, max: 1, step: 0.05 },
   { group: 'Recovery', path: 'model.recovery.wRhr', label: 'Gewicht Ruhepuls', min: 0, max: 1, step: 0.05 },
   { group: 'Recovery', path: 'model.recovery.wSleep', label: 'Gewicht Schlaf', min: 0, max: 1, step: 0.05 },
@@ -124,6 +141,10 @@ export const PARAMS = [
   { group: 'Recovery', path: 'model.recovery.spread', label: 'Spreizfaktor', min: 0.5, max: 3, step: 0.1 },
   { group: 'Recovery', path: 'model.recovery.red', label: 'Grenze rot unter', min: 10, max: 50, step: 1 },
   { group: 'Recovery', path: 'model.recovery.green', label: 'Grenze grün ab', min: 50, max: 90, step: 1 },
+  { group: 'Sporterkennung', path: 'model.detect.overRhr', label: 'Puls über Ruhepuls', min: 10, max: 60, step: 5 },
+  { group: 'Sporterkennung', path: 'model.detect.ofMax', label: 'oder Anteil des Maximalpulses', min: 0.4, max: 0.8, step: 0.05 },
+  { group: 'Sporterkennung', path: 'model.detect.minMin', label: 'Mindestdauer (min)', min: 5, max: 60, step: 1 },
+  { group: 'Sporterkennung', path: 'model.detect.gapMin', label: 'Pause überbrücken (min)', min: 1, max: 15, step: 1 },
   { group: 'Frühwarnung', path: 'model.warn.z', label: 'Abweichung für Infektwarnung (σ)', min: 0.5, max: 3, step: 0.1 },
   { group: 'Frühwarnung', path: 'model.warn.nights', label: 'Nächte nacheinander', min: 1, max: 5, step: 1 },
   { group: 'Frühwarnung', path: 'model.warn.rhrAbs', label: 'Ruhepuls-Wochenmedian über (bpm)', min: 70, max: 130, step: 1 },
@@ -152,6 +173,8 @@ export const PARAMS = [
   { group: 'Tagesform', path: 'model.form.lifestyle.caffeineLate', label: 'Abzug für spätes Koffein', min: 0, max: 10, step: 1 },
   { group: 'Tagesform', path: 'model.form.lifestyle.water', label: 'Abzug für wenig Wasser', min: 0, max: 10, step: 1 },
   { group: 'Tagesform', path: 'model.form.lifestyle.cap', label: 'Logbuch-Abzug höchstens', min: 0, max: 20, step: 1 },
+  { group: 'Tagesform', path: 'model.form.capFrom', label: 'Deckel ab Recovery unter', min: 0, max: 100, step: 5 },
+  { group: 'Tagesform', path: 'model.form.capAdd', label: 'Deckel: Abstand zur Recovery', min: 0, max: 50, step: 5 },
   { group: 'Langzeit-Fitness', path: 'model.fitness.halfLife', label: 'Halbwertszeit (Tage)', min: 14, max: 120, step: 1 },
   { group: 'Langzeit-Fitness', path: 'model.fitness.activeTarget', label: 'Ziel Aktivminuten pro Woche', min: 60, max: 600, step: 10 },
   { group: 'Baseline', path: 'model.baselineWindow', label: 'Fenster (Tage)', min: 14, max: 60, step: 1 },

@@ -452,6 +452,13 @@ function Preferences() {
         <span class="d">Verhindert, dass die Zahl dein Gefühl beeinflusst.</span></div>
       <div class="list-row"><span class="t">Frühwarnungen auf „Heute“</span><${Switch} id="warn" label="Frühwarnungen" checked=${s.display.warnings} onChange=${(v) => set('display.warnings', v)} />
         <span class="d">Meldet dauerhafte Abweichungen bei Ruhepuls, HRV, Atemfrequenz, Blutsauerstoff, Schlafdauer und Stimmung. Grenzen unter „Modell und Gewichte“.</span></div>
+      <div class="list-row"><span class="t">Sport aus dem Puls erkennen</span><${Switch} id="det" label="Sport aus dem Puls erkennen" checked=${s.model.detect.on} onChange=${(v) => set('model.detect.on', v)} />
+        <span class="d">Fragt auf „Heute“ nach, wenn der Puls über ${num(s.model.detect.minMin)} Minuten erhöht war, ohne dass ein Training eingetragen ist. Jede Antwort verbessert die Schätzung.</span></div>
+      <div class="list-row"><span class="t">Intimität zur Auswahl anbieten</span><${Switch} id="priv" label="Intimität zur Auswahl anbieten" checked=${s.survey.askPrivate} onChange=${(v) => set('survey.askPrivate', v)} />
+        <span class="d">Erhöhter Puls hat nicht immer mit Sport zu tun. Ist das aus, taucht die Art nirgends auf.</span></div>
+      <div class="list-row"><span class="t">Gelerntes zurücksetzen</span>
+        <button type="button" class="btn small ghost" onClick=${async () => { await saveSettings({ ...state.repo.settings, learned: { sport: { v: 1, byId: {}, n: 0 }, notSport: [] } }); toast('Die Erkennung beginnt wieder von vorn'); }}>Zurücksetzen</button>
+        <span class="d">${(() => { const n = Object.keys(s.learned?.sport?.byId || {}).length; return n ? `Die App kennt ${n} ${n === 1 ? 'Sportart' : 'Sportarten'} aus ${num(s.learned.sport.n)} Einträgen.` : 'Noch nichts gelernt.'; })()} Verwirft auch die Zeiträume, die du als „Kein Sport“ markiert hast.</span></div>
       <div class="list-row"><span class="t">Logbuch zählt zur Tagesform</span><${Switch} id="lifest" label="Logbuch zählt zur Tagesform" checked=${s.model.form.lifestyle.on} onChange=${(v) => set('model.form.lifestyle.on', v)} />
         <span class="d">Alkohol, Koffein und Wasser des Vortags verschieben die Tagesform um höchstens ${num(s.model.form.lifestyle.cap)} Punkte nach unten und ${num(s.model.form.lifestyle.bonus)} nach oben. Die Gründe stehen unter „Was deine Werte bewegt“.</span></div>
       <div class="list-row"><span class="t">Hinweis bei fehlenden Messwerten</span><${Switch} id="dchk" label="Hinweis bei fehlenden Messwerten" checked=${s.display.dataCheck} onChange=${(v) => set('display.dataCheck', v)} />

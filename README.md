@@ -2,7 +2,7 @@
 
 Persönliche Tagesform, Recovery, Schlaf und Strain aus den Daten deines Amazfit Helio Strap, dazu ein kurzer Morgen- und Abendcheck, ein Logbuch für Wasser, Koffein, Glück, Sport, Arbeitszeit und Tagebuch und eine Analyse, welche Gewohnheiten und Umweltfaktoren deine Werte bewegen. Eine Web-App: Jedes Konto besteht aus Name und PIN und liegt verschlüsselt auf dem Gerät. Wer will, verbindet es mit einem Online-Konto (E-Mail und Passwort) und nutzt es auf mehreren Geräten gleichzeitig; die Daten werden vorher auf dem Gerät verschlüsselt. Freunde nutzen denselben Link und legen ihr eigenes Konto an.
 
-Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.9.0.
+Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.10.0.
 
 ## Auf GitHub Pages bringen (kostenlos)
 
@@ -11,7 +11,7 @@ GitHub Pages braucht die Datei `index.html` ganz oben im Repository. Liegt sie e
 ### Erstes Hochladen (Windows)
 
 1. Auf github.com ein kostenloses Konto anlegen und ein neues Repository erstellen, Name zum Beispiel `formkurve`, Sichtbarkeit **Public** (GitHub Pages ist nur für öffentliche Repositories kostenlos; der Code enthält keine persönlichen Daten).
-2. `formkurve-0.9.0.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
+2. `formkurve-0.10.0.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
 3. Im Repository auf **Add file → Upload files** klicken.
 4. Im geöffneten Ordner **alles markieren** (Strg + A) und in das Upload-Feld ziehen. Nicht den Ordner selbst ziehen und nicht die ZIP-Datei.
 5. Warten, bis alle Dateien aufgelistet sind, dann unten **Commit changes**.
@@ -293,6 +293,26 @@ Recovery misst keinen absoluten Wert, sondern den Abstand zu deinen eigenen Näc
 - **Nur wenige Vergleichsnächte:** Ein Apple-Health-Gesamtexport bringt die Historie auf einen Schlag mit (bis 400 Tage zurück); der Kurzbefehl liefert nur die letzten Tage.
 - **HRV landet einen Tag zu früh:** Die Zeile unter der Tabelle sagt es. Dann unter **Beim Import** den HRV-Tagesversatz auf „+1 Tag“ stellen. Die Prüfung liest die Rohdaten und gilt unabhängig davon, wie der Schalter gerade steht.
 
+## Sport: erkennen, eintragen, nachlesen
+
+### „War das Sport?“
+
+Lag dein Puls über längere Zeit erhöht, ohne dass ein Training eingetragen ist, fragt eine Karte auf „Heute“ nach. Erkannt wird ein Abschnitt, wenn der Puls mindestens 12 Minuten über deinem Ruhepuls + 30 bpm (oder über 55 % des Maximalpulses) liegt; Pausen bis 5 Minuten überbrückt die App, Schlafzeiten und bereits bekannte Trainings lässt sie aus. Die Karte zeigt Zeitraum, Dauer, Ø- und Höchstpuls, Schritte je Minute und Energie – daraus wird die Art geschätzt.
+
+Du kannst alles ändern: die **Sportart** aus 33 Arten in fünf Gruppen (Ausdauer, Kraft und Studio, Ballsport, Beweglichkeit, Alltag), den **Zeitraum** über Von und Bis. **Eintragen** schreibt die Einheit ins Logbuch, **Kein Sport** merkt sich den Zeitraum und fragt nicht wieder.
+
+Zum Ballsport gehören Fußball, Basketball, Volleyball, Handball, Tennis, Tischtennis, Badminton, Squash, Padel, Hockey und Golf. Unter Alltag stehen auch Hausarbeit, **Intimität** und **Stress, Aufregung** — erhöhter Puls hat nicht immer mit Sport zu tun, und was die App als das erkennt, was es war, verfälscht die Last nicht. Intimität lässt sich unter **Profil → Einstellungen → Intimität zur Auswahl anbieten** ausblenden; sie und Stress zählen nicht ins Trainingspensum.
+
+### Die Schätzung lernt mit
+
+Jede Sportart hat Startwerte für Puls, Dauer, Schritte je Minute und Tageszeit. Trägst du eine Einheit ein, wandern die Werte dieser Art auf deine eigenen zu; nach etwa zehn Einträgen zählt fast nur noch, was du selbst eingetragen hast. So unterscheidet die App mit der Zeit dein Krafttraining von deinem Fußball, auch wenn der Puls ähnlich aussieht. Auch die vorgeschlagene Dauer mischt sich aus Messung (65 %) und deiner Gewohnheit (35 %).
+
+Das Gelernte liegt in den Einstellungen und gleicht sich mit deinen Geräten ab. **Profil → Einstellungen → Gelerntes zurücksetzen** zeigt, wie viele Arten die App aus wie vielen Einträgen kennt, und beginnt auf Wunsch von vorn.
+
+### Zusammenfassung einer Einheit
+
+Ein Tipp auf eine Trainingszeile unter **Belastung** öffnet die Zusammenfassung: Zeitraum und Quelle, Dauer, Ø- und Höchstpuls, Schritte im Zeitraum, Energie, die Last dieser Einheit und die Zeit in den sechs Pulszonen als Balken und Liste.
+
 ## Wie Schlaf, Erholung und Logbuch zusammenhängen
 
 ### Schlafbedarf
@@ -308,6 +328,19 @@ Der Bedarf ist keine feste Zahl, sondern wächst mit dem, was hinter dir liegt:
 | Mittagsschlaf | zieht bis zu 1 h ab |
 
 Der Mehrbedarf ist zusammen auf 2,5 h gedeckelt. Zwei Nächte Party mit wenig Schlaf, hohem Strain und schwacher Erholung heben ihn also deutlich – in der Schlafkarte steht die Rechnung aufgeschlüsselt: „Bedarf 9:45 h = 8:00 h Grundbedarf + 1,0 h Schlafschuld + 0,5 h für die Belastung davor + 0,3 h für die schwache Erholung“.
+
+### Warum eine durchzechte Nacht die Tagesform nicht rettet
+
+Bis Version 0.9 zählte der heutige Tag nur zur Hälfte in die Tagesform, und Belastungsbalance und Langzeit-Fitness (zusammen 30 %) ändern sich kaum. Nach einer kurzen Nacht mit Alkohol konnte die Tagesform deshalb höher liegen als an einem normalen Tag davor — die langsamen Teile trugen darüber hinweg. Seit 0.10 gilt:
+
+| | vorher | jetzt |
+| --- | --- | --- |
+| Heute zählt | 50 % | 60 % |
+| Recovery | 45 % | 50 % |
+| Belastungsbalance | 15 % | 10 % |
+| **Deckel** | — | Liegt die Recovery heute unter 40, kann die Tagesform höchstens 15 Punkte darüber liegen |
+
+Dazu zieht ein verschobener Rhythmus Punkte: Gehst du 1,5 h später schlafen als sonst −2, ab 3 h später −4. Beides steht mit Begründung in der Karte **Was deine Werte bewegt**, die jetzt auch zeigt, **woraus die Tagesform entsteht** — jeder Anteil mit Wert und Gewicht, und ob der Deckel gegriffen hat.
 
 ### Warum Schlaf-Score und Recovery auseinanderlaufen können
 
@@ -383,6 +416,9 @@ Dieselbe Liste benutzt die Infektwarnung: Gibt es eine Erklärung und kein Krank
 | `js/analysis/insights.js` | Einflussfaktoren (auch je Supplement), Permutationstest, Benjamini-Hochberg, Ridge |
 | `js/model/hints.js` | Hinweise des Tages und die Begründung, wenn die Tagesform fehlt |
 | `js/model/earlywarning.js` | Frühwarnungen: Auslöser, Störfaktoren, Pausen |
+| `js/model/sports.js` | Katalog der Sportarten mit Startwerten für die Erkennung |
+| `js/model/detect.js` | Abschnitte mit erhöhtem Puls finden, Art schätzen, aus Einträgen lernen |
+| `js/ui/workouts.js` | Karte „War das Sport?“, Sportauswahl und die Zusammenfassung einer Einheit |
 | `js/model/lifestyle.js` | Logbuch-Zuschlag auf die Tagesform und die Erklärungen für auffällige Nachtwerte |
 | `js/ui/cards.js` | Karten auf „Heute“: Katalog, Sichtbarkeit, Vorschlag zum Ausblenden |
 | `js/model/coverage.js` | Datenprüfung: Zustand je Messwert, welche Berechnung woran hängt, Text der Meldung |
