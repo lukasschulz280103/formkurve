@@ -39,7 +39,7 @@ export function findSessions({ index, date, rhr, hrMax, known = [], sleep = null
   }
   if (cur) runs.push(cur);
 
-  const out = [];
+  const roh = [];
   for (const r of runs) {
     const durMin = (r.to - r.from) / MIN;
     if (durMin < p.minMin || r.vals.length < 3) continue;
@@ -49,7 +49,7 @@ export function findSessions({ index, date, rhr, hrMax, known = [], sleep = null
     if (sleep && r.from < sleep.wake && r.to > sleep.onset) continue;
     if (known.some((w) => r.from < w.to + p.nearMin * MIN && r.to > w.from - p.nearMin * MIN)) continue;
     const steps = stepsBetween(index, r.from, r.to);
-    out.push({
+    roh.push({
       key: sessionKey(date, r.from),
       date,
       from: r.from,
@@ -62,9 +62,36 @@ export function findSessions({ index, date, rhr, hrMax, known = [], sleep = null
       spm: isNum(steps) ? steps / Math.max(1, durMin) : null,
       energy: sumBetween(index, 'energy', r.from, r.to),
       hour: new Date(r.from).getHours() + new Date(r.from).getMinutes() / 60,
+      vals: r.vals,
     });
   }
-  return out;
+  return mergeNear(roh, p);
+}
+
+/**
+ * Abschnitte mit kurzer Pause dazwischen gehören meist zusammen: die Hantelbank,
+ * dann zehn Minuten reden, dann weiter. Besser einmal fragen als zweimal.
+ */
+function mergeNear(list, p) {
+  const out = [];
+  for (const x of list) {
+    const last = out[out.length - 1];
+    if (last && x.from - last.to <= (p.mergeMin ?? 15) * MIN) {
+      const vals = last.vals.concat(x.vals);
+      last.pause = Math.round((last.pause || 0) + (x.from - last.to) / MIN);
+      last.to = x.to;
+      last.vals = vals;
+      last.durMin = Math.round((last.to - last.from) / MIN);
+      last.avgHr = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+      last.maxHr = Math.round(Math.max(...vals));
+      last.steps = isNum(last.steps) && isNum(x.steps) ? last.steps + x.steps : last.steps ?? x.steps;
+      last.energy = isNum(last.energy) && isNum(x.energy) ? last.energy + x.energy : last.energy ?? x.energy;
+      last.spm = isNum(last.steps) ? last.steps / Math.max(1, last.durMin) : null;
+      continue;
+    }
+    out.push({ ...x });
+  }
+  return out.map(({ vals, ...rest }) => rest);
 }
 
 /** Schritte im Zeitfenster. Stundenpakete werden anteilig gerechnet. */

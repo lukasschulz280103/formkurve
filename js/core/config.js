@@ -56,7 +56,7 @@ export const DEFAULTS = {
     // Erkennung von Sport aus dem Puls
     detect: {
       on: true,
-      overRhr: 30, ofMax: 0.55, gapMin: 5, minMin: 12, nearMin: 12,
+      overRhr: 30, ofMax: 0.55, gapMin: 5, minMin: 12, nearMin: 12, mergeMin: 15,
     },
     warn: {
       z: 1.5, // Abweichung von der eigenen Baseline, ab der ein Nachtwert auffällt

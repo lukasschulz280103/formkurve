@@ -49,10 +49,15 @@ test('Nächtliche Ruhe senkt den Schlaf-Score einer unruhigen Nacht', () => {
 test('Logbuch verschiebt die Tagesform, immer mit Begründung', () => {
   const leer = lifestyleAdjust({ day: {}, prev: {}, settings: S });
   assert.deepEqual(leer, { delta: 0, reasons: [] });
-  // Alkohol am Abend davor
-  const alk = lifestyleAdjust({ day: { answers: { A3: true, X1: 4 } }, prev: {}, settings: S });
+  // Alkohol zählt für die Nacht danach: der Abendcheck von gestern, nicht der von heute
+  const alk = lifestyleAdjust({ day: {}, prev: { answers: { A3: true, X1: 4 } }, settings: S });
   assert.equal(alk.delta, -S.model.form.lifestyle.alcoholCap, 'je Getränk mehr, aber gedeckelt');
-  assert.equal(lifestyleAdjust({ day: { answers: { A3: true, X1: 1 } }, prev: {}, settings: S }).delta, -S.model.form.lifestyle.alcohol);
+  assert.equal(lifestyleAdjust({ day: {}, prev: { answers: { A3: true, X1: 1 } }, settings: S }).delta, -S.model.form.lifestyle.alcohol);
+  // Was heute Abend getrunken wird, kostet erst morgen etwas
+  assert.deepEqual(lifestyleAdjust({ day: { answers: { A3: true, X1: 7 } }, prev: {}, settings: S }).reasons, []);
+  // Ein „nein“ von heute darf das „ja“ von gestern nicht verdecken
+  const gestern = lifestyleAdjust({ day: { answers: { A3: false } }, prev: { answers: { A3: true, X1: 7 } }, settings: S });
+  assert.equal(gestern.reasons[0]?.id, 'alkohol');
   assert.match(alk.reasons[0].text, /4 Getränke/);
   // Wenig getrunken und spätes Koffein am Vortag
   const prev = { journal: { waterMl: 900, caffeineMg: 450, caffeineLast: new Date('2026-11-05T21:30:00').getTime() } };
@@ -60,25 +65,25 @@ test('Logbuch verschiebt die Tagesform, immer mit Begründung', () => {
   assert.deepEqual(mix.reasons.map((r) => r.id).sort(), ['koffein', 'koffein-spaet', 'wasser']);
   assert.equal(mix.delta, -5);
   // Deckelung greift
-  const viel = lifestyleAdjust({ day: { answers: { A3: true, X1: 10 } }, prev, settings: S });
+  const viel = lifestyleAdjust({ day: {}, prev: { ...prev, answers: { A3: true, X1: 10 } }, settings: S });
   assert.equal(viel.delta, -S.model.form.lifestyle.cap);
   // Trinkziel erreicht gibt einen kleinen Bonus
-  const gut = lifestyleAdjust({ day: { answers: { A3: false } }, prev: { journal: { waterMl: 2000 } }, settings: S });
+  const gut = lifestyleAdjust({ day: {}, prev: { answers: { A3: false }, journal: { waterMl: 2000 } }, settings: S });
   assert.equal(gut.delta, S.model.form.lifestyle.bonus);
   // Abschaltbar
   const aus = mergeSettings({ model: { form: { lifestyle: { on: false } } } });
-  assert.equal(lifestyleAdjust({ day: { answers: { A3: true } }, prev, settings: aus }).delta, 0);
+  assert.equal(lifestyleAdjust({ day: {}, prev: { ...prev, answers: { A3: true } }, settings: aus }).delta, 0);
 });
 
 test('Störfaktoren erklären auffällige Nachtwerte', () => {
-  const nacht = { z: { rhr: 2.1, hrv: -1.8 }, answers: { A3: true } };
-  const e = explainNight(nacht, { strain: 30 }, S);
+  const nacht = { z: { rhr: 2.1, hrv: -1.8 } };
+  const e = explainNight(nacht, { strain: 30, answers: { A3: true } }, S);
   assert.deepEqual(e.odd.map((o) => o.label), ['Ruhepuls', 'HRV']);
   assert.equal(e.causes.length, 1);
   assert.match(e.causes[0].text, /5 bis 10 bpm/);
   assert.equal(e.strong, true);
   // Ohne Auffälligkeit keine Erklärung, auch wenn Alkohol im Spiel war
-  assert.deepEqual(explainNight({ z: { rhr: 0.2, hrv: 0.1 }, answers: { A3: true } }, {}, S).causes, []);
+  assert.deepEqual(explainNight({ z: { rhr: 0.2, hrv: 0.1 } }, { answers: { A3: true } }, S).causes, []);
   // Hartes Training und spätes Koffein werden erkannt
   const d2 = nightDisturbances({ z: {} }, { strain: 85, journal: { caffeineLast: new Date('2026-11-05T22:00:00').getTime() } }, S);
   assert.deepEqual(d2.map((x) => x.id), ['training', 'koffein']);

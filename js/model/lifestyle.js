@@ -12,7 +12,11 @@ function hourOf(ms) {
   return h < 4 ? h + 24 : h;
 }
 
-/** Hat der Abend davor Alkohol gesehen? Aus dem Abendcheck, sonst aus dem Logbuch. */
+/**
+ * Alkohol am Abend vor dieser Nacht. Wichtig: Der Abendcheck eines Tages wird am Abend
+ * ausgefüllt, also NACH der Nacht, die dieser Tag misst. Für die Nacht von Tag d zählt
+ * deshalb der Abendcheck von d−1. Wer heute Abend trinkt, bezahlt es morgen.
+ */
 export function alcoholOf(day) {
   if (!day) return null;
   // `answers` ist der Check-in samt Logbuch; ohne Pipeline nur die Antworten selbst
@@ -31,7 +35,7 @@ export function lifestyleAdjust({ day, prev, settings }) {
   const reasons = [];
   const add = (id, points, text) => reasons.push({ id, points, text });
 
-  const alc = alcoholOf(day) || alcoholOf(prev);
+  const alc = alcoholOf(prev);
   if (alc && (alc.drinks === null || alc.drinks > 0)) {
     const n = isNum(alc.drinks) ? alc.drinks : 1;
     const pts = Math.min(p.alcoholCap, p.alcohol + Math.max(0, n - 1) * p.alcoholPerDrink);
@@ -75,7 +79,7 @@ export function lifestyleAdjust({ day, prev, settings }) {
 export function nightDisturbances(day, prev, settings) {
   const p = settings?.model?.warn || {};
   const out = [];
-  const alc = alcoholOf(day) || alcoholOf(prev);
+  const alc = alcoholOf(prev);
   if (alc && (alc.drinks === null || alc.drinks > 0)) {
     out.push({
       id: 'alkohol',

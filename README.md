@@ -2,7 +2,7 @@
 
 Persönliche Tagesform, Recovery, Schlaf und Strain aus den Daten deines Amazfit Helio Strap, dazu ein kurzer Morgen- und Abendcheck, ein Logbuch für Wasser, Koffein, Glück, Sport, Arbeitszeit und Tagebuch und eine Analyse, welche Gewohnheiten und Umweltfaktoren deine Werte bewegen. Eine Web-App: Jedes Konto besteht aus Name und PIN und liegt verschlüsselt auf dem Gerät. Wer will, verbindet es mit einem Online-Konto (E-Mail und Passwort) und nutzt es auf mehreren Geräten gleichzeitig; die Daten werden vorher auf dem Gerät verschlüsselt. Freunde nutzen denselben Link und legen ihr eigenes Konto an.
 
-Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.10.0.
+Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.10.1.
 
 ## Auf GitHub Pages bringen (kostenlos)
 
@@ -11,7 +11,7 @@ GitHub Pages braucht die Datei `index.html` ganz oben im Repository. Liegt sie e
 ### Erstes Hochladen (Windows)
 
 1. Auf github.com ein kostenloses Konto anlegen und ein neues Repository erstellen, Name zum Beispiel `formkurve`, Sichtbarkeit **Public** (GitHub Pages ist nur für öffentliche Repositories kostenlos; der Code enthält keine persönlichen Daten).
-2. `formkurve-0.10.0.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
+2. `formkurve-0.10.1.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
 3. Im Repository auf **Add file → Upload files** klicken.
 4. Im geöffneten Ordner **alles markieren** (Strg + A) und in das Upload-Feld ziehen. Nicht den Ordner selbst ziehen und nicht die ZIP-Datei.
 5. Warten, bis alle Dateien aufgelistet sind, dann unten **Commit changes**.
@@ -309,6 +309,10 @@ Jede Sportart hat Startwerte für Puls, Dauer, Schritte je Minute und Tageszeit.
 
 Das Gelernte liegt in den Einstellungen und gleicht sich mit deinen Geräten ab. **Profil → Einstellungen → Gelerntes zurücksetzen** zeigt, wie viele Arten die App aus wie vielen Einträgen kennt, und beginnt auf Wunsch von vorn.
 
+### Was die Erkennung zusammenfasst
+
+Zwei Abschnitte mit weniger als 15 Minuten Pause dazwischen gelten als eine Einheit: Hantelbank, zehn Minuten reden, weiter. Die Karte nennt die Pause, damit die Zusammenfassung nachvollziehbar bleibt.
+
 ### Zusammenfassung einer Einheit
 
 Ein Tipp auf eine Trainingszeile unter **Belastung** öffnet die Zusammenfassung: Zeitraum und Quelle, Dauer, Ø- und Höchstpuls, Schritte im Zeitraum, Energie, die Last dieser Einheit und die Zeit in den sechs Pulszonen als Balken und Liste.
@@ -394,6 +398,15 @@ Dieselbe Liste benutzt die Infektwarnung: Gibt es eine Erklärung und kein Krank
 3. Über den Tag: Wasser und Kaffee mit einem Tippen auf „Heute“ oder im Logbuch eintragen, Sport ohne Band dort ergänzen.
 4. Abends: Glück, Arbeitszeit und ein paar Zeilen Tagebuch im Logbuch, dann der Abendcheck, etwa 30 Sekunden; was im Logbuch steht, fragt er nicht mehr. Erinnern kann eine Kurzbefehl-Automation „Tageszeit 21:00 → Mitteilung anzeigen“.
 5. Nach etwa 6 Wochen werden die Einsichten belastbar.
+
+## Prüfung an echten Daten
+
+Im Ordner `test/fixtures/echte-naechte.json` liegen zehn echte Nächte mit dem Helio Strap, anonymisiert: Datum um 364 Tage zurückgeschoben (Wochentage bleiben gleich), kein Tagebuchtext, Puls der neun älteren Tage auf ein 10-Minuten-Raster ausgedünnt. `test/echtedaten.test.mjs` hält damit fest, was an diesen Tagen herauskommen muss — unter anderem, dass die Nacht nach sieben Getränken eine Tagesform unter 25 ergibt und nicht wie früher um die 40.
+
+Diese Testdaten haben zwei Fehler aufgedeckt, die mit erfundenen Daten unsichtbar blieben:
+
+- **Alkohol auf der falschen Nacht.** Der Abendcheck wird am Abend ausgefüllt, also nach der Nacht, die der Tag misst. Die Tagesform zog den Alkohol deshalb vom falschen Tag ab — und ein „nein“ am Folgetag verdeckte das „ja“ vom Vortag ganz. Jetzt gilt für die Nacht von Tag d der Abendcheck von d−1.
+- **Eine Einheit als zwei gezählt.** Eine Trainingspause von zehn Minuten teilte den Abschnitt in zwei Nachfragen.
 
 ## Was wo im Code steht
 
