@@ -91,7 +91,7 @@ function Hypnogram({ segs, sleep }) {
     <div class="lane axis">
       <span class="lane-name"></span>
       <div class="track">${ticks.map((t) => html`<span class="tick" key=${t} style=${`left:${pct(t)}`}>${clock(t)}</span>`)}</div>
-    </div>
+    </section>
   </div>`;
 }
 
@@ -207,8 +207,9 @@ export function NightSheet({ date, metric = 'sleep', onClose }) {
     ['Wach', sleep.awakeMin, 'var(--st-awake)'],
   ] : [];
 
-  return html`<div class="scrim" onClick=${(e) => e.target === e.currentTarget && onClose()}>
-    <div class="sheet night" role="dialog" aria-modal="true" aria-labelledby="n-title" tabIndex="-1" ref=${ref}>
+  return html`<div class="sheet-backdrop" onClick=${onClose}>
+    <section class="sheet night" role="dialog" aria-modal="true" aria-labelledby="n-title" tabIndex="-1" ref=${ref} onClick=${(e) => e.stopPropagation()}>
+      <div class="sheet-grip" aria-hidden="true"></div>
       <div class="sheet-head">
         <div>
           <span class="tiny muted">${wday(day)}, ${dayShort(day)}${sleep ? ` · ${clock(sleep.start)}–${clock(sleep.end)}` : ''}</span>
@@ -241,6 +242,6 @@ export function NightSheet({ date, metric = 'sleep', onClose }) {
 
       ${range !== 'nacht' && dates.length ? html`<p class="tiny muted">Tippe auf eine Nacht, um sie einzeln zu sehen. ${dates.length} von ${r.days} Tagen haben Daten.</p>` : null}
       ${range === 'nacht' && m.id !== 'sleep' && points.length ? html`<p class="tiny muted">${points.length} Messwerte zwischen ${clock(sleep.start)} und ${clock(sleep.end)}.</p>` : null}
-    </div>
+    </section>
   </div>`;
 }

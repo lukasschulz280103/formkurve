@@ -67,3 +67,32 @@ test('Update: Service Worker und App tragen dieselbe Version, Zwischenspeicher j
   assert.ok(sw.includes("k.startsWith('formkurve-')"), 'nur eigene Zwischenspeicher löschen');
   assert.ok(!/indexedDB\.(open|deleteDatabase)|caches\.delete\((?!k)/.test(sw), 'der Service Worker fasst die Daten nie an');
 });
+
+test('Update: tausendfach zu hohe Energiewerte werden repariert, echte bleiben', async () => {
+  const inner = await openStore('energy-fix');
+  await inner.put('kv', 'meta', { dataFormat: 2 });
+  const t0 = Date.UTC(2026, 9, 25, 8, 0);
+  const min = 60000;
+  // Falsch gelesen: „8.854“ → 8854, „0.506“ → 506 (immer ganzzahlig, über 30 kcal je Minute)
+  await inner.put('raw', 'energy|2026-10-25|iPhone', {
+    type: 'energy', date: '2026-10-25', src: 'iPhone',
+    t: [t0, t0 + 10 * min, t0 + 20 * min], e: [t0 + 6 * min, t0 + 30 * min, t0 + 30 * min], v: [8854, 506, 0.29],
+  });
+  // Zepp liefert ganze kcal je Zehnminutenpaket – plausibel und unangetastet
+  await inner.put('raw', 'energy|2026-10-25|Zepp', {
+    type: 'energy', date: '2026-10-25', src: 'Zepp',
+    t: [t0], e: [t0 + 10 * min], v: [116],
+  });
+  await inner.put('raw', 'steps|2026-10-25|iPhone', {
+    type: 'steps', date: '2026-10-25', src: 'iPhone', t: [t0], e: [t0 + 10 * min], v: [1234],
+  });
+  const repo = new Repo(inner);
+  await repo.load();
+  await repo.migrate();
+  assert.deepEqual(repo.buckets.get('energy|2026-10-25|iPhone').v, [8.854, 0.506, 0.29]);
+  assert.deepEqual(repo.buckets.get('energy|2026-10-25|Zepp').v, [116], 'Zepp bleibt');
+  assert.deepEqual(repo.buckets.get('steps|2026-10-25|iPhone').v, [1234], 'Schritte bleiben');
+  assert.equal(repo.meta.dataFormat, DATA_FORMAT);
+  // und auf der Platte, nicht nur im Speicher
+  assert.deepEqual((await inner.get('raw', 'energy|2026-10-25|iPhone')).v, [8.854, 0.506, 0.29]);
+});

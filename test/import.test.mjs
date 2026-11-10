@@ -77,3 +77,30 @@ test('Health-Export: ZIP wird gestreamt entpackt', async () => {
   assert.equal(stats.workouts, 1);
   assert.equal(got.length, 5);
 });
+
+test('Aktive Energie aus dem Apple-Export: Punkt ist Dezimaltrennzeichen', () => {
+  // Apple schreibt kcal mit drei Dezimalstellen. Bis 0.12 wurden daraus Tausender: 8,854 kcal → 8854 kcal.
+  const xml = `<HealthData locale="de_DE">
+ <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="iPhone" unit="kcal" startDate="2026-10-25 09:00:00 +0100" endDate="2026-10-25 09:06:00 +0100" value="8.854"/>
+ <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="iPhone" unit="kcal" startDate="2026-10-25 09:10:00 +0100" endDate="2026-10-25 09:20:00 +0100" value="0.506"/>
+ <Record type="HKQuantityTypeIdentifierStepCount" sourceName="iPhone" unit="count" startDate="2026-10-25 09:00:00 +0100" endDate="2026-10-25 09:10:00 +0100" value="1234"/>
+</HealthData>`;
+  const samples = [];
+  const sc = createXmlScanner({ sinceMs: Date.UTC(2025, 0, 1), onSample: (s) => samples.push(s) });
+  sc.push(xml);
+  const energie = samples.filter((s) => s.type === 'energy').map((s) => s.v);
+  assert.deepEqual(energie, [8.854, 0.506]);
+  assert.equal(samples.find((s) => s.type === 'steps').v, 1234);
+});
+
+test('Kurzbefehl: Schritte mit Tausenderpunkt, Energie als Bruchwert', async () => {
+  const { parseShortcutText: parse } = await import('../js/import/shortcut.js');
+  const text = [
+    'Schritte;2026-10-25T10:00:00+01:00;2026-10-25T10:59:00+01:00;1.234;Schritte;iPhone',
+    'Aktive Energie;2026-10-25T10:00:00+01:00;2026-10-25T10:10:00+01:00;4,596;kcal;iPhone',
+    'Aktive Energie;2026-10-25T11:00:00+01:00;2026-10-25T11:10:00+01:00;0.506;kcal;iPhone',
+  ].join('\n');
+  const { samples } = parse(text);
+  assert.equal(samples.find((s) => s.type === 'steps').v, 1234);
+  assert.deepEqual(samples.filter((s) => s.type === 'energy').map((s) => s.v), [4.596, 0.506]);
+});

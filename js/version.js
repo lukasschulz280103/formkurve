@@ -1,2 +1,2 @@
 // Eine Stelle für die Versionsnummer. sw.js trägt dieselbe Nummer (ein Test prüft das).
-export const APP_VERSION = '0.12.0';
+export const APP_VERSION = '0.13.1';

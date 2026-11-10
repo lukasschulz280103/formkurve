@@ -154,6 +154,8 @@ export function entriesOf(rec, type) {
 export function isEmptyDay(rec) {
   if (!rec) return true;
   if (['water', 'caffeine', 'sport'].some((t) => entriesOf(rec, t).length)) return false;
+  // Geänderte oder ausgeblendete Trainings machen den Tag ebenfalls nicht leer
+  if (Object.keys(rec.f || {}).some((k) => k.startsWith('wk:') && rec.f[k]?.v)) return false;
   return !['happy', 'work', 'text', 'noCaffeine'].some((k) => {
     const v = fieldValue(rec, k);
     return v !== null && v !== '' && v !== false;

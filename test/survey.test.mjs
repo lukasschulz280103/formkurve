@@ -106,3 +106,15 @@ test('Supplements: alte Angaben gelten fort, bis es eine neue Antwort gibt', () 
   assert.equal(supplementsOf(effectiveAnswers(mixed, MONDAY)), undefined);
   assert.deepEqual(recentSupplements(mixed, MONDAY, 14, addDays), ['zink', 'magnesium']);
 });
+
+test('Nikotin: mehrere Artikel gleichzeitig, „nein“ schließt sie aus', async () => {
+  const { QUESTIONS } = await import('../js/survey/catalog.js');
+  const q = QUESTIONS.find((x) => x.id === 'X5');
+  assert.equal(q.type, 'multi');
+  assert.equal(q.exclusive, 'nein');
+  for (const id of ['zigaretten', 'iqos', 'vape', 'beutel', 'shisha', 'zigarre']) {
+    assert.ok(q.options.some((o) => o.v === id), id);
+  }
+  const { computeInsights } = await import('../js/analysis/insights.js');
+  assert.equal(typeof computeInsights, 'function');
+});

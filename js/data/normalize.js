@@ -81,13 +81,19 @@ export function parseNumber(v, type) {
   if (!s || s === '-') return NaN;
   const hasC = s.includes(',');
   const hasD = s.includes('.');
-  const integerType = type === 'steps' || type === 'energy';
+  // Schritte sind immer ganzzahlig: dort darf „1.234“ eine Tausendertrennung sein.
+  // Energie ist ein Bruchwert – der Apple-Export schreibt „8.854“ für 8,854 kcal.
+  const integerType = type === 'steps';
+  // Tausendertrennung nur, wenn die erste Gruppe nicht mit 0 beginnt („0.506“ sind 0,506)
+  const grouped = (sep) => new RegExp(`^-?[1-9]\\d{0,2}(\\${sep}\\d{3})+$`).test(s);
+  // Mehr als eine Gruppe („1.234.567“) kann nur Tausendertrennung sein
+  const multi = (sep) => s.split(sep).length - 1 >= 2;
   if (hasC && hasD) {
     if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g, '').replace(',', '.');
     else s = s.replace(/,/g, '');
   } else if (hasC) {
-    s = integerType && /^-?\d{1,3}(,\d{3})+$/.test(s) ? s.replace(/,/g, '') : s.replace(',', '.');
-  } else if (hasD && integerType && /^-?\d{1,3}(\.\d{3})+$/.test(s)) {
+    s = (integerType && grouped(',')) || multi(',') ? s.replace(/,/g, '') : s.replace(',', '.');
+  } else if (hasD && ((integerType && grouped('.')) || multi('.'))) {
     s = s.replace(/\./g, '');
   }
   const n = Number(s);

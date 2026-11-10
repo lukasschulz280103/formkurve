@@ -33,6 +33,11 @@ const inc = (arr, v) => Array.isArray(arr) && arr.includes(v);
 const answered = (arr) => Array.isArray(arr) && arr.length > 0;
 const time = (hm) => hmToMinutes(hm);
 
+/** X5 war früher ein einzelner Wert, heute eine Liste. Beides muss weiter zählen. */
+const nicList = (v) => (Array.isArray(v) ? v : v == null ? [] : [v]);
+const hasNicotine = (v) => nicList(v).some((x) => x && x !== 'nein');
+const isNoNicotine = (v) => nicList(v).length > 0 && nicList(v).every((x) => x === 'nein');
+
 function F(id, group, label, get, a, b, targets, extra = {}) {
   return { id, group, label, get, a, b, targets, lag: 1, aLabel: 'ja', bLabel: 'nein', ...extra };
 }
@@ -65,7 +70,7 @@ export const FACTORS = [
   multiOpt('A12', 'streit', 'Ereignisse', 'Streit', ['hrv', 'rhr', 'latencySubj', 'sleepScore']),
   multiOpt('A12', 'pruefung', 'Ereignisse', 'Prüfung oder Deadline', ['hrv', 'rhr', 'latencySubj', 'sleepScore']),
   multiOpt('A12', 'wettkampf', 'Ereignisse', 'Wettkampf', ['hrv', 'rhr', 'recovery']),
-  F('nicotine', 'Gewohnheiten', 'Nikotin', (c) => c.a.X5, (v) => v && v !== 'nein', (v) => v === 'nein', ['rhr', 'hrv', 'latency']),
+  F('nicotine', 'Gewohnheiten', 'Nikotin', (c) => c.a.X5, (v) => hasNicotine(v), (v) => isNoNicotine(v), ['rhr', 'hrv', 'latency']),
   F('cannabis', 'Gewohnheiten', 'Cannabis oder andere Substanzen', (c) => c.a.X6, (v) => v === true, (v) => v === false, ['rem', 'deep', 'hrv']),
 
   // Training

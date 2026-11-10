@@ -8,6 +8,7 @@ import { InfoButton } from './info.js';
 import { Icon } from './icons.js';
 import { num, hours, clock, dayLabel, dateFull, signed, ago } from './format.js';
 import { addDays } from '../core/time.js';
+import { isNum } from '../core/stats.js';
 import { summarize, formGap } from '../model/hints.js';
 import { cardOn, withCard } from './cards.js';
 import { explainNight } from '../model/lifestyle.js';
@@ -100,7 +101,16 @@ function rangeOf(base, floor, transform = (x) => x) {
   return [transform(base.median - s), transform(base.median + s)];
 }
 
-function Vital({ name, k, value, unit, digits = 0, range, z, onOpen = null }) {
+/** „22–92 ms aus 4 Messungen“ – dieselbe Spanne, die Apple Health zeigt. */
+function spanText(span, unit, digits) {
+  if (!span) return null;
+  const [lo, hi, n] = span;
+  if (!isNum(lo) || !isNum(hi)) return null;
+  const werte = lo === hi ? `${num(lo, digits)} ${unit}` : `${num(lo, digits)}–${num(hi, digits)} ${unit}`;
+  return `in der Nacht ${werte} aus ${num(n)} ${n === 1 ? 'Messung' : 'Messungen'}`;
+}
+
+function Vital({ name, k, value, unit, digits = 0, range, z, onOpen = null, spanNote = null, extra = null }) {
   if (value == null) return null;
   const lo = range?.[0];
   const hi = range?.[1];
@@ -115,6 +125,8 @@ function Vital({ name, k, value, unit, digits = 0, range, z, onOpen = null }) {
     ${onOpen ? html`<button type="button" class="range as-link" onClick=${onOpen} aria-label=${`Verlauf von ${name} ansehen`}>
       <${RangeBar} value=${value} lo=${lo} hi=${hi} min=${min} max=${max} /><span class="note">${note} <${Icon} name="right" size=${12} /></span></button>`
       : html`<div class="range"><${RangeBar} value=${value} lo=${lo} hi=${hi} min=${min} max=${max} /><span class="note">${note}</span></div>`}
+    ${spanNote ? html`<div class="tiny muted">${spanNote}</div>` : null}
+    ${extra ? html`<div class="tiny muted">${extra}</div>` : null}
   </div>`;
 }
 
@@ -158,7 +170,7 @@ function ProfileHint() {
 }
 
 /** Tagesform je Woche oder Monat im Durchschnitt. */
-function FormPeriods({ full = false }) {
+function FormPeriods({ full = false, inline = null }) {
   const s = state.repo.settings;
   const unit = s.display.formPeriod === 'month' ? 'month' : 'week';
   const [table, setTable] = useState(false);
@@ -168,7 +180,7 @@ function FormPeriods({ full = false }) {
   const { red, green } = s.model.recovery;
   const word = unit === 'week' ? 'Woche' : 'Monat';
   const head = sum.current.partial ? `${unit === 'week' ? 'Diese Woche' : 'Dieser Monat'} (${sum.current.label})` : sum.current.label;
-  return html`<${Card} id="periods" full=${full} title="Tagesform im Schnitt"
+  return html`<${Card} id="periods" inline=${inline} full=${full} title="Tagesform im Schnitt"
     sub=${full ? html`<button class="btn small ghost" aria-pressed=${table ? 'true' : 'false'} onClick=${() => setTable(!table)}><${Icon} name="table" size=${16} />${table ? 'Diagramm' : 'Tabelle'}</button>` : null}>
     ${full ? html`<${Segmented} label="Zusammenfassen nach" value=${unit} onChange=${(v) => patchSettings('display.formPeriod', v)} options=${[{ value: 'week', label: 'Wochen' }, { value: 'month', label: 'Monate' }]} />` : null}
     <div class="period-stat">
@@ -280,41 +292,63 @@ function NeedParts({ d }) {
  * Hülle jeder Karte auf „Heute“: Titel, Zusatz rechts und oben in der Ecke ein Knopf,
  * der denselben Inhalt als ganze Seite öffnet. Auf der Seite fehlt der Knopf.
  */
-function Card({ id, title, sub, full, children, label = null }) {
+export function Card({ id, title, sub, full, children, label = null, inline = null }) {
+  // Kurze Karten klappen an derselben Stelle auf; lange öffnen eine eigene Seite.
+  const knopf = inline
+    ? html`<button type="button" class="zoom" onClick=${inline.toggle} aria-expanded=${inline.open ? 'true' : 'false'}
+        aria-label=${inline.open ? `${title} wieder einklappen` : `${title} ausklappen`}>
+        <${Icon} name=${inline.open ? 'up' : 'down'} size=${15} />
+      </button>`
+    : html`<button type="button" class="zoom" onClick=${() => navigate('heute', id)} aria-label=${`${title} als ganze Seite öffnen`}>
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      </button>`;
   return html`<section class="card" aria-label=${label || title}>
     <div class="card-head">
       <h2>${title}</h2>
       <div class="row" style="gap:8px;align-items:center">
         ${sub || null}
-        ${full ? null : html`<button type="button" class="zoom" onClick=${() => navigate('heute', id)} aria-label=${`${title} als ganze Seite öffnen`}>
-          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-        </button>`}
+        ${full && !inline ? null : knopf}
       </div>
     </div>
     ${children}
   </section>`;
 }
 
+/**
+ * Karten, deren ganze Ansicht kurz bleibt (gut unter einem Drittel des Bildschirms),
+ * klappen im Heute-Reiter auf und zu statt eine eigene Seite zu öffnen.
+ */
+function Inline({ comp, ...props }) {
+  const [open, setOpen] = useState(false);
+  return html`<${comp} ...${props} full=${open} inline=${{ open, toggle: () => setOpen(!open) }} />`;
+}
+
 /** Letzte Nacht. Kurz: die zwei Werte, die die Recovery tragen, plus Auffälligkeiten. */
 function NightCard({ d, prev, onNight, full = false }) {
   const leer = d.hrv == null && d.rhr == null;
+  // Die Spanne der Einzelmessungen steht nur in der ganzen Ansicht: sie erklärt,
+  // warum Apple Health höhere Höchstwerte zeigt als unser Nachtmittel.
+  const rhrExtra = isNum(d.rhrApple) && isNum(d.rhr) && d.rhrSource !== 'Apple Health' && Math.abs(d.rhrApple - d.rhr) >= 1
+    ? `dein Gerät meldet ${num(d.rhrApple)} bpm an Apple Health`
+    : null;
   const vitals = [
-    ['HRV', 'hrv', d.hrv, 'ms', 0, rangeOf(d.base?.lnHrv, 0.06, Math.exp), d.z?.hrv, 'hrv'],
-    [`Ruhepuls${d.rhrSource === 'Apple Health' ? ' (Apple Health)' : ''}`, 'rhr', d.rhr, 'bpm', 0, rangeOf(d.base?.rhr, 1.5), d.z?.rhr, 'rhr'],
-    ['Atemfrequenz', 'resp', d.resp, '/min', 1, rangeOf(d.base?.resp, 0.4), d.z?.resp, 'resp'],
-    ['Blutsauerstoff', 'spo2', d.spo2, '%', 1, rangeOf(d.base?.spo2, 0.7), d.z?.spo2, 'spo2'],
-    ['Hauttemperatur', 'temp', d.temp, '°C', 1, rangeOf(d.base?.temp, 0.15), d.z?.temp, null],
+    ['HRV', 'hrv', d.hrv, 'ms', 0, rangeOf(d.base?.lnHrv, 0.06, Math.exp), d.z?.hrv, 'hrv', spanText(d.hrvSpan, 'ms', 0), null],
+    [`Ruhepuls${d.rhrSource === 'Apple Health' ? ' (Apple Health)' : ''}`, 'rhr', d.rhr, 'bpm', 0, rangeOf(d.base?.rhr, 1.5), d.z?.rhr, 'rhr', spanText(d.hrSpan, 'bpm', 0), rhrExtra],
+    ['Atemfrequenz', 'resp', d.resp, '/min', 1, rangeOf(d.base?.resp, 0.4), d.z?.resp, 'resp', spanText(d.respSpan, '/min', 0), null],
+    ['Blutsauerstoff', 'spo2', d.spo2, '%', 1, rangeOf(d.base?.spo2, 0.7), d.z?.spo2, 'spo2', spanText(d.spo2Span, '%', 0), null],
+    ['Hauttemperatur', 'temp', d.temp, '°C', 1, rangeOf(d.base?.temp, 0.15), d.z?.temp, null, null, null],
   ];
   const zeigen = full ? vitals : vitals.slice(0, 2);
   return html`<${Card} id="night" full=${full} title="Letzte Nacht"
     sub=${d.sleep ? html`<span class="tiny muted tnum">${clock(d.sleep.onset)}–${clock(d.sleep.wake)}</span>` : null}>
     <div class="vitals">
-      ${zeigen.map(([name, k, value, unit, digits, range, z, metric]) => html`<${Vital} key=${k} name=${name} k=${k} value=${value}
-        unit=${unit} digits=${digits} range=${range} z=${z} onOpen=${metric ? () => onNight(metric) : null} />`)}
+      ${zeigen.map(([name, k, value, unit, digits, range, z, metric, span, extra]) => html`<${Vital} key=${k} name=${name} k=${k} value=${value}
+        unit=${unit} digits=${digits} range=${range} z=${z} onOpen=${metric ? () => onNight(metric) : null}
+        spanNote=${full ? span : null} extra=${full ? extra : null} />`)}
     </div>
     ${leer ? html`<p class="small muted">Keine Nachtwerte. Prüfe, ob Zepp HRV und Herzfrequenz an Apple Health schreibt. <${HideCard} id="night" /></p>` : null}
     <${NightReason} d=${d} prev=${prev} full=${full} />
-    ${full ? html`<p class="tiny muted" style="margin-top:8px">Tippe auf einen Balken für den Verlauf der Nacht. Der graue Balken ist dein persönlicher Normalbereich, das (i) zeigt die allgemeinen Richtwerte.</p>` : null}
+    ${full ? html`<p class="tiny muted" style="margin-top:8px">Die großen Zahlen sind Mittel über die Nacht – Apple Health zeigt dieselben Messungen als Spanne mit Höchstwert. Tippe auf einen Balken für den Verlauf der Nacht. Der graue Balken ist dein persönlicher Normalbereich, das (i) zeigt die allgemeinen Richtwerte.</p>` : null}
   <//>`;
 }
 
@@ -380,11 +414,11 @@ function LoadCard({ d, date, onOpen, full = false }) {
 }
 
 /** Was die Werte bewegt. Kurz: die drei stärksten Anteile und die Summe aus dem Logbuch. */
-function ContribCard({ d, contrib, full = false }) {
+function ContribCard({ d, contrib, full = false, inline = null }) {
   const lf = d.lifestyle;
   if (!contrib.length && !lf?.reasons?.length) return null;
   const items = full ? contrib : contrib.slice(0, 3);
-  return html`<${Card} id="contrib" full=${full} title="Was deine Werte bewegt" sub=${html`<span class="tiny muted">Punkte</span>`}>
+  return html`<${Card} id="contrib" inline=${inline} full=${full} title="Was deine Werte bewegt" sub=${html`<span class="tiny muted">Punkte</span>`}>
     ${items.length ? html`<${Contributions} items=${items} />` : null}
     ${full && contrib.length ? html`<p class="tiny muted" style="margin-top:10px">Recovery gegenüber einem Tag, an dem alles genau deinem Normalwert entspricht (Recovery 50).</p>` : null}
     ${full && d.formParts?.length ? html`<hr class="divider" />
@@ -402,13 +436,13 @@ function ContribCard({ d, contrib, full = false }) {
 }
 
 /** Hinweise. Kurz: nur Warnungen, höchstens zwei. */
-function HintsCard({ d, full = false }) {
+function HintsCard({ d, full = false, inline = null }) {
   const alle = d.hints || [];
   if (!alle.length) return null;
   const wichtig = alle.filter((h) => h.level !== 'info');
   const zeigen = full ? alle : (wichtig.length ? wichtig : alle).slice(0, 2);
   const rest = alle.length - zeigen.length;
-  return html`<${Card} id="hints" full=${full} title="Hinweise des Tages" label="Hinweise">
+  return html`<${Card} id="hints" inline=${inline} full=${full} title="Hinweise des Tages" label="Hinweise">
     ${zeigen.map((h) => html`<div key=${h.title} class=${`hint ${{ critical: 'c-crit', warning: 'c-warn', info: 'c-info' }[h.level]}`}>
       <${Icon} name=${h.level === 'info' ? 'info' : 'alert'} size=${20} />
       <div><b>${h.title}</b>${full ? html`<p>${h.text}</p>` : null}</div>
@@ -459,7 +493,7 @@ function BackupHint() {
   </section>`;
 }
 
-function Environment({ date, full = false }) {
+function Environment({ date, full = false, inline = null }) {
   const s = state.repo.settings;
   const today = state.repo.context.get(date) || null;
   const night = state.repo.context.get(addDays(date, -1)) || null;
@@ -486,7 +520,7 @@ function Environment({ date, full = false }) {
   const warm = night?.nightTempMin != null && night.nightTempMin >= 20;
   const dreck = pm != null && pm > 15;
   const pollen = today?.pollenMax != null && today.pollenMax >= 50;
-  return html`<${Card} id="environment" full=${full} title="Umwelt"
+  return html`<${Card} id="environment" inline=${inline} full=${full} title="Umwelt"
     sub=${html`<span class="tiny muted" style="text-align:right">${formatPlace(s.context.place)}</span>`}>
     <dl class="kv">
       ${night?.nightTempMin != null ? html`<${KV} label=${warm ? 'Nacht, Tiefstwert (Tropennacht)' : 'Nacht, Tiefstwert'} value=${`${num(night.nightTempMin, 1)} °C`} k="nightTemp" infoValue=${night.nightTempMin} />` : null}
@@ -656,7 +690,7 @@ export function TodayView() {
         <${ProfileHint} />
         <${BackupHint} />
         ${vis('contrib') ? html`<${ContribCard} d=${d} contrib=${contrib} />` : null}
-        ${vis('hints') ? html`<${HintsCard} d=${d} />` : null}
+        ${vis('hints') ? html`<${Inline} comp=${HintsCard} d=${d} />` : null}
         ${showEvening ? html`<section class="card row between">
           <div class="grow"><h3>Abendcheck</h3><p class="small muted">Was heute war, in etwa 30 Sekunden.</p></div>
           <button class="btn primary small" onClick=${() => openCheck('evening', state.today)}>Starten</button>
@@ -666,7 +700,7 @@ export function TodayView() {
         ${vis('detect') ? html`<${DetectCard} date=${date} />` : null}
         ${vis('workouts') ? html`<${WorkoutsCard} onOpen=${setOpenWk} Card=${Card} />` : null}
         ${vis('load') ? html`<${LoadCard} d=${d} date=${date} onOpen=${setOpenWk} />` : null}
-        ${vis('environment') ? html`<${Environment} date=${date} />` : null}
+        ${vis('environment') ? html`<${Inline} comp=${Environment} date=${date} />` : null}
       ` : null}
       ${hasAny && !d ? html`<section class="card"><p class="muted">Für diesen Tag gibt es keine Daten.</p></section>` : null}
       ${openWk ? html`<${WorkoutSheet} item=${openWk} date=${openWk.date || date} onClose=${() => setOpenWk(null)} />` : null}

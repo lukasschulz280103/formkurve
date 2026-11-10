@@ -9,8 +9,20 @@ import { zoneMinutes } from '../model/scores.js';
 import { SPORTS, SPORT, SPORT_GROUPS, sportLabel, coarseKind } from '../model/sports.js';
 import { sessionSuggestions, learn, stepsBetween } from '../model/detect.js';
 import * as J from '../journal/journal.js';
+import { sessionsOfDay, mergeSessions, setPatch } from '../journal/sessions.js';
+import { Icon } from './icons.js';
+import { SessionEdit, Photo } from './sessionEdit.js';
 
 const MIN = 60000;
+/** Pulsbereich einer Zone in Schlägen, aus Ruhepuls und Maximalpuls. */
+function bpmRange(i, rhr, hrMax, edges) {
+  if (!isNum(rhr) || !isNum(hrMax)) return '';
+  const res = hrMax - rhr;
+  const von = i === 0 ? rhr : Math.round(rhr + edges[i - 1] * res);
+  const bis = i >= edges.length ? hrMax : Math.round(rhr + edges[i] * res);
+  return i >= edges.length ? `ab ${von} bpm` : `${von}–${bis} bpm`;
+}
+
 const clock = (ms) => new Date(ms).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 const hhmm = (ms) => {
   const d = new Date(ms);
@@ -102,7 +114,7 @@ function Candidate({ sess }) {
     <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
       <button type="button" class="btn primary" disabled=${busy} onClick=${ok}>Eintragen</button>
       <button type="button" class="btn ghost" disabled=${busy} onClick=${() => dismissSession(sess.key)}>Kein Sport</button>
-    </div>
+    </section>
   </div>`;
 }
 
@@ -150,21 +162,14 @@ export function DetectCard({ date }) {
 }
 
 /** Alle Einheiten der letzten Tage, gemessen wie eingetragen, neueste zuerst. */
-export function recentWorkouts(results, repo, today, n = 12) {
+export function recentWorkouts(results, repo, today, n = 12, tage = 120) {
   const out = [];
-  for (let i = 0; i < 90 && out.length < n * 3; i++) {
+  for (let i = 0; i < tage && out.length < n * 3; i++) {
     const date = addDays(today, -i);
     const d = results?.days?.get(date);
-    if (!d) continue;
-    for (const w of d.workouts || []) out.push({ ...w, date, quelle: w.src || 'Messung' });
-    for (const e of J.entriesOf(repo.journal?.get(date), 'sport')) {
-      const m = toMinutes(e.at);
-      const base = new Date(`${date}T00:00:00`).getTime();
-      // Eingetragene Einheiten, die zu einer gemessenen passen, stehen nicht doppelt
-      const t = base + (isNum(m) ? m : 12 * 60) * MIN;
-      if (out.some((w) => w.date === date && Math.abs(w.t - t) < 45 * MIN)) continue;
-      out.push({ t, durMin: e.min, kind: e.kind, sport: e.sport, km: e.km ?? null, rpe: e.rpe ?? null, date, quelle: 'Logbuch', eigen: true });
-    }
+    const rec = repo.journal?.get(date);
+    if (!d && !rec) continue;
+    for (const w of sessionsOfDay(d?.workouts || [], rec, date)) out.push({ ...w, quelle: w.eigen ? 'Logbuch' : w.src || 'Messung' });
   }
   return out.sort((a, b) => b.t - a.t).slice(0, n);
 }
@@ -177,7 +182,35 @@ const tempo = (w) => {
   return `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')} min/km`;
 };
 
-/** Karte „Letzte Trainings“: alles auf einen Blick, Tippen öffnet die Zusammenfassung. */
+/** Eine Einheit im Feed: Kopf, Zahlen, Notiz, Ort, Bilder. */
+function FeedItem({ w, onOpen, onEdit, pick, picked }) {
+  const zahlen = [
+    hours(w.durMin),
+    isNum(w.km) && w.km > 0 ? `${num(w.km, 2)} km` : null,
+    tempo(w),
+    isNum(w.avgHr) ? `Ø ${num(w.avgHr)} bpm` : null,
+    isNum(w.kcal) && w.kcal > 0 ? `${num(w.kcal)} kcal` : null,
+  ].filter(Boolean);
+  return html`<article class=${`feed-item${picked ? ' picked' : ''}${w.stress ? ' stress' : ''}`}>
+    ${pick ? html`<label class="feed-pick"><input type="checkbox" checked=${picked} onChange=${() => pick(w)} aria-label=${`${sportLabel(w.sport || w.kind)} auswählen`} /></label>` : null}
+    <div class="feed-main">
+      <button type="button" class="feed-head" onClick=${() => onOpen(w)}>
+        <span><b>${sportLabel(w.sport || w.kind)}</b>${w.stress ? html` <span class="status c-warn" style="padding:1px 7px;font-size:11px">Stress</span>` : null}
+          ${w.merged ? html` <span class="tiny muted">${w.merged + 1} Einheiten</span>` : null}
+          <span class="muted block tiny">${new Date(`${w.date}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })} · ${clock(w.t)} · ${w.quelle || w.src || 'Messung'}${w.edited ? ' · bearbeitet' : ''}</span></span>
+        <${Icon} name="right" size=${15} />
+      </button>
+      <div class="feed-nums tnum">${zahlen.map((x, i) => html`<span key=${i}>${x}</span>`)}</div>
+      ${w.place ? html`<div class="feed-place tiny muted"><${Icon} name="location" size=${13} />${w.place}</div>` : null}
+      ${w.note ? html`<p class="feed-note small">${w.note}</p>` : null}
+      ${w.photos?.length ? html`<div class="photos">${w.photos.map((p) => html`<${Photo} key=${p.id} id=${p.id} alt=${`Bild zu ${sportLabel(w.sport || w.kind)}`} />`)}</div>` : null}
+      ${onEdit ? html`<div class="row" style="gap:8px;margin-top:6px">
+        <button type="button" class="btn small ghost" onClick=${() => onEdit(w)}>Bearbeiten</button>
+      </div>` : null}
+    </div>
+  </article>`;
+}
+
 export function WorkoutsCard({ onOpen, full = false, Card }) {
   const repo = state.repo;
   const alle = useMemo(() => recentWorkouts(state.results, repo, state.today, full ? 40 : 12), [state.version, state.journalVersion, full]);
@@ -187,23 +220,100 @@ export function WorkoutsCard({ onOpen, full = false, Card }) {
   const kmWoche = woche.reduce((s, w) => s + (isNum(w.km) ? w.km : 0), 0);
   const minWoche = woche.reduce((s, w) => s + (w.durMin || 0), 0);
   const kopf = html`<span class="tiny muted tnum">7 Tage: ${num(Math.round(minWoche))} min${kmWoche > 0 ? ` · ${num(kmWoche, 1)} km` : ''}</span>`;
-  return html`<${Card} id="workouts" full=${full} title="Letzte Trainings" sub=${kopf}>
-    <div class="wk-list">
-      ${list.map((w) => html`<button type="button" class="wk-item" key=${`${w.t}-${w.quelle}`} onClick=${() => onOpen(w)}>
-        <span class="wk-when"><b>${sportLabel(w.sport || w.kind)}</b>
-          <span class="muted">${new Date(w.date + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })} · ${clock(w.t)}</span></span>
-        <span class="wk-num tnum">
-          <b>${hours(w.durMin)}</b>
-          <span class="muted">${[isNum(w.km) && w.km > 0 ? `${num(w.km, 2)} km` : null, tempo(w), isNum(w.avgHr) ? `Ø ${num(w.avgHr)}` : null, isNum(w.kcal) && w.kcal > 0 ? `${num(w.kcal)} kcal` : null].filter(Boolean).join(' · ') || w.quelle}</span>
-        </span>
-      </button>`)}
+  if (!full) {
+    return html`<${Card} id="workouts" full=${false} title="Letzte Trainings" sub=${kopf}>
+      <div class="wk-list">
+        ${list.map((w) => html`<button type="button" class="wk-item" key=${w.key} onClick=${() => onOpen(w)}>
+          <span class="wk-when"><b>${sportLabel(w.sport || w.kind)}</b>${w.stress ? ' · Stress' : ''}
+            <span class="muted">${new Date(`${w.date}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })} · ${clock(w.t)}</span></span>
+          <span class="wk-num tnum">
+            <b>${hours(w.durMin)}</b>
+            <span class="muted">${[isNum(w.km) && w.km > 0 ? `${num(w.km, 2)} km` : null, tempo(w), isNum(w.avgHr) ? `Ø ${num(w.avgHr)}` : null].filter(Boolean).join(' · ') || w.quelle}</span>
+          </span>
+        </button>`)}
+      </div>
+      ${alle.length > list.length ? html`<p class="tiny muted" style="margin-top:6px">${alle.length - list.length} weitere in der Seitenansicht.</p>` : null}
+    <//>`;
+  }
+  return html`<${WorkoutFeed} list=${alle} onOpen=${onOpen} kopf=${kopf} Card=${Card} />`;
+}
+
+/** Trainings als Feed: bearbeiten, ausblenden, als Stress markieren, zusammenlegen. */
+function WorkoutFeed({ list, onOpen, kopf, Card }) {
+  const [edit, setEdit] = useState(null);
+  const [pickMode, setPickMode] = useState(false);
+  const [picked, setPicked] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const toggle = (w) => setPicked((p) => (p.some((x) => x.key === w.key) ? p.filter((x) => x.key !== w.key) : [...p, w]));
+  const tage = [...new Set(picked.map((x) => x.date))];
+  const zusammen = async () => {
+    if (picked.length < 2) return;
+    if (tage.length > 1) {
+      toast('Zusammenlegen geht nur innerhalb eines Tages', 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      await changeJournal(tage[0], (rec) => mergeSessions(rec, picked));
+      toast(`${picked.length} Einheiten zu einer zusammengelegt`);
+      setPicked([]);
+      setPickMode(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const alsStress = async () => {
+    setBusy(true);
+    try {
+      for (const w of picked) {
+        await changeJournal(w.date, (rec) => (w.eigen
+          ? J.updateEntry(rec, w.entryId, { stress: true })
+          : setPatch(rec, w.key, { stress: true })));
+      }
+      toast(`${picked.length} als Stress einsortiert`);
+      setPicked([]);
+      setPickMode(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return html`<${Card} id="workouts" full=${true} title="Trainings" sub=${kopf}>
+    <div class="row between" style="margin-bottom:10px">
+      <span class="small muted">${list.length} Einheiten</span>
+      <button type="button" class="btn small ghost" aria-pressed=${pickMode ? 'true' : 'false'}
+        onClick=${() => { setPickMode(!pickMode); setPicked([]); }}>${pickMode ? 'Fertig' : 'Auswählen'}</button>
     </div>
-    ${full ? html`<p class="tiny muted" style="margin-top:8px">Gemessenes und selbst Eingetragenes zusammen. Kilometer kommen aus Apple Health oder Strava; wo das Band keine Strecke liefert, bleibt die Spalte leer.</p>` : null}
-    ${!full && alle.length > list.length ? html`<p class="tiny muted" style="margin-top:6px">${alle.length - list.length} weitere in der Seitenansicht.</p>` : null}
+    ${pickMode ? html`<div class="banner" style="margin-bottom:10px">
+      <${Icon} name="info" size=${18} />
+      <div class="grow stack-s">
+        <span>${picked.length === 0 ? 'Mehrere Einheiten eines Tages auswählen.' : `${picked.length} ausgewählt${tage.length > 1 ? ' – aus mehreren Tagen' : ''}.`}</span>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn small" disabled=${picked.length < 2 || busy} onClick=${zusammen}>Zusammenlegen</button>
+          <button type="button" class="btn small ghost" disabled=${!picked.length || busy} onClick=${alsStress}>Als Stress</button>
+        </div>
+      </div>
+    </div>` : null}
+    <div class="feed">
+      ${list.map((w) => html`<${FeedItem} key=${w.key} w=${w} onOpen=${onOpen} onEdit=${pickMode ? null : setEdit}
+        pick=${pickMode ? toggle : null} picked=${picked.some((x) => x.key === w.key)} />`)}
+    </div>
+    ${!list.length ? html`<p class="small muted">Noch keine Einheiten. Gemessene kommen aus Apple Health, Zepp oder Strava; eigene trägst du im Logbuch ein.</p>` : null}
+    <p class="tiny muted" style="margin-top:10px">Gemessenes und selbst Eingetragenes zusammen. Änderungen lassen die Messwerte unberührt und lassen sich zurücknehmen. Bilder bleiben auf diesem Gerät.</p>
+    ${edit ? html`<${SessionEdit} item=${edit} onClose=${() => setEdit(null)} />` : null}
   <//>`;
 }
 
-const ZONE_LABEL = ['Erholung', 'Grundlage', 'Fettstoffwechsel', 'Tempo', 'Schwelle', 'Maximal'];
+// Zonen nach Herzfrequenzreserve (Karvonen): Anteil zwischen Ruhepuls und Maximalpuls.
+// Die Grenzen stehen in den Einstellungen unter „Modell und Gewichte“.
+const ZONES = [
+  { name: 'Unter Zone 1', was: 'Alltag', wirkt: 'Hier zählt die Zeit kaum als Training.' },
+  { name: 'Zone 1', was: 'Erholung', wirkt: 'Lockeres Gehen. Fördert die Regeneration, kostet fast nichts.' },
+  { name: 'Zone 2', was: 'Grundlage', wirkt: 'Unterhaltung möglich. Baut die Ausdauer-Grundlage und den Fettstoffwechsel.' },
+  { name: 'Zone 3', was: 'Tempo', wirkt: 'Zügig, Sprechen wird knapp. Verbessert die Dauerleistung, kostet schon Erholung.' },
+  { name: 'Zone 4', was: 'Schwelle', wirkt: 'An der Grenze zum Übersäuern. Hebt die Schwelle, braucht danach Erholung.' },
+  { name: 'Zone 5', was: 'Maximal', wirkt: 'Intervalle, nur Minuten haltbar. Höchste Wirkung, höchste Kosten.' },
+];
+const ZONE_LABEL = ZONES.map((z) => z.name);
 
 /** Zusammenfassung eines Trainings: Zeiten, Puls, Zonen, Schritte, Energie. */
 export function WorkoutSheet({ item, date, onClose }) {
@@ -221,13 +331,15 @@ export function WorkoutSheet({ item, date, onClose }) {
   const detail = useMemo(() => {
     const win = repo.index.window('hr', from, to);
     const rhr = d?.base?.rhr?.median ?? d?.rhr ?? 60;
-    const zm = win.t.length ? zoneMinutes(win.t, win.e, win.v, { rhr, hrMax: hrMaxOf(repo.settings), gapCapMin: repo.settings.model.strain.gapCapMin, edges: repo.settings.model.strain.zoneEdges }) : null;
-    return { zones: zm?.zones || null, steps: stepsBetween(repo.index, from, to), n: win.t.length };
+    const hrMax = hrMaxOf(repo.settings);
+    const zm = win.t.length ? zoneMinutes(win.t, win.e, win.v, { rhr, hrMax, gapCapMin: repo.settings.model.strain.gapCapMin, edges: repo.settings.model.strain.zoneEdges }) : null;
+    return { zones: zm?.zones || null, steps: stepsBetween(repo.index, from, to), n: win.t.length, rhr, hrMax };
   }, [from, to]);
   const zonen = detail.zones;
   const gesamt = zonen ? zonen.reduce((a, b) => a + b, 0) : 0;
-  return html`<div class="scrim" onClick=${(e) => e.target === e.currentTarget && onClose()}>
-    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="wk-title" tabIndex="-1" ref=${ref}>
+  return html`<div class="sheet-backdrop" onClick=${onClose}>
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="wk-title" tabIndex="-1" ref=${ref} onClick=${(e) => e.stopPropagation()}>
+      <div class="sheet-grip" aria-hidden="true"></div>
       <div class="sheet-head">
         <div>
           <span class="tiny muted">${clock(from)}–${clock(to)}${item.src ? ` · ${item.src}` : ''}</span>
@@ -249,14 +361,19 @@ export function WorkoutSheet({ item, date, onClose }) {
       </dl>
       ${gesamt > 0 ? html`<div>
         <b class="small">Zeit in den Pulszonen</b>
-        <div class="zonebar" role="img" aria-label=${zonen.map((v, i) => `${ZONE_LABEL[i]} ${Math.round(v)} Minuten`).join(', ')}>
+        <div class="zonebar" role="img" aria-label=${zonen.map((v, i) => `${ZONES[i].name} ${Math.round(v)} Minuten`).join(', ')}>
           ${zonen.map((v, i) => (v > 0 ? html`<span key=${i} class=${`z${i}`} style=${`flex:${v}`}></span>` : null))}
         </div>
-        <ul class="bullets small" style="margin-top:6px">
-          ${zonen.map((v, i) => (v >= 0.5 ? html`<li key=${i}>${ZONE_LABEL[i]}: ${num(v)} min</li>` : null))}
-        </ul>
+        <dl class="zonelist">
+          ${zonen.map((v, i) => (v >= 0.5 ? html`<div key=${i}>
+            <dt><i class=${`z${i}`}></i><b>${ZONES[i].name}</b> <span class="muted">${ZONES[i].was}</span>
+              <span class="tiny muted">${bpmRange(i, detail.rhr, detail.hrMax, repo.settings.model.strain.zoneEdges)}</span></dt>
+            <dd>${num(v)} min<span class="muted"> · ${num((v / gesamt) * 100)} %</span></dd>
+            <p class="tiny muted">${ZONES[i].wirkt}</p>
+          </div>` : null))}
+        </dl>
       </div>` : html`<p class="small muted">Für dieses Training liegen keine einzelnen Pulswerte vor.</p>`}
-      <p class="tiny muted">Die Zonen rechnen mit deinem Ruhepuls und dem geschätzten Maximalpuls aus den Körperdaten.</p>
-    </div>
+      <p class="tiny muted">Die Zonen rechnen nach Herzfrequenzreserve: Anteil zwischen deinem Ruhepuls (${num(detail.rhr)} bpm) und deinem geschätzten Maximalpuls (${num(detail.hrMax)} bpm) aus den Körperdaten.</p>
+    </section>
   </div>`;
 }

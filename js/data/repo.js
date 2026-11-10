@@ -10,12 +10,45 @@ export const DB_DEMO = 'formkurve-demo';
 
 // Format der gespeicherten Daten. Jede App-Version liest alle älteren Formate;
 // eine Umwandlung läuft einmal beim Öffnen und ändert nie Antworten oder Messwerte, sie ergänzt höchstens.
-export const DATA_FORMAT = 2;
+export const DATA_FORMAT = 3;
 const MIGRATIONS = {
   // 1 -> 2 (Version 0.3): nichts umzuwandeln. Alte Antworten (zum Beispiel Supplements aus dem Ernährungsmodul)
   // bleiben unverändert gespeichert und werden beim Lesen den neuen Fragen zugeordnet.
   2: async () => {},
+  // 2 -> 3 (Version 0.13): tausendfach zu hohe Werte der aktiven Energie reparieren.
+  // Der Apple-Export schreibt „8.854“ für 8,854 kcal; bis 0.12 wurde der Punkt als
+  // Tausendertrennung gelesen, aus 8,854 kcal wurden 8854 kcal.
+  3: async (repo) => {
+    const entries = [];
+    for (const [key, b] of repo.buckets) {
+      if (b.type !== 'energy') continue;
+      let changed = false;
+      const v = b.v.map((x, i) => {
+        if (!falseScale(x, b.t[i], b.e?.[i])) return x;
+        changed = true;
+        return Math.round((x / 1000) * 1000) / 1000;
+      });
+      if (!changed) continue;
+      const fixed = { ...b, v };
+      repo.buckets.set(key, fixed);
+      entries.push([key, fixed]);
+    }
+    if (entries.length) {
+      await repo.db.putMany('raw', entries);
+      repo.rebuildIndex();
+    }
+  },
 };
+
+// Mehr als 20 kcal je Minute hält niemand über Minuten durch (Spitzensport liegt bei etwa 25).
+// Dazu war ein falsch gelesener Wert immer ganzzahlig und mindestens 100 – der Punkt fiel weg,
+// während echte Apple-Werte Dezimalstellen haben und Zepp nur kleine ganze Zahlen liefert.
+const ENERGY_MAX_PER_MIN = 20;
+function falseScale(v, t, e) {
+  if (!Number.isFinite(v) || !Number.isInteger(v) || v < 100) return false;
+  const min = Math.max(1, ((e || t) - t) / 60000);
+  return v / min > ENERGY_MAX_PER_MIN && v / 1000 / min <= ENERGY_MAX_PER_MIN;
+}
 
 export class Repo {
   constructor(db) {
@@ -269,6 +302,19 @@ export class Repo {
     if (entries.length) await this.db.putMany('context', entries);
     this.meta = { ...this.meta, lastContext: Date.now() };
     await this.db.put('kv', 'meta', this.meta);
+  }
+
+  /** Bild zu einem Training ablegen. Bleibt auf diesem Gerät, wird nicht abgeglichen. */
+  async putPhoto(id, blob) {
+    await this.db.put('media', id, blob);
+  }
+
+  async getPhoto(id) {
+    return this.db.get('media', id);
+  }
+
+  async delPhoto(id) {
+    await this.db.del('media', id);
   }
 
   async exportBackup({ includeRaw = false } = {}) {

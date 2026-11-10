@@ -11,6 +11,7 @@ import {
 import { exclusionReason, subjectiveZ, trainingFromSurvey } from '../survey/engine.js';
 import { daySummary, withJournal } from '../journal/journal.js';
 import { lifestyleAdjust } from './lifestyle.js';
+import { applyPatches } from '../journal/sessions.js';
 import { buildHints } from './hints.js';
 
 function sleepByDay(index, p) {
@@ -45,6 +46,7 @@ function nightly(index, date, sleep, settings) {
     out.rhr = quantile(hr, 0.1);
     out.avgSleepHr = mean(hr);
     out.rhrSource = 'Schlaf';
+    out.hrSpan = [Math.min(...hr), Math.max(...hr), hr.length];
   }
   const apple = index.picked('rhr', date);
   if (apple?.v?.length) {
@@ -65,22 +67,28 @@ function nightly(index, date, sleep, settings) {
     out.lnHrv = mean(hrv.map((x) => Math.log(x)));
     out.hrv = Math.exp(out.lnHrv);
     out.hrvN = hrv.length;
+    // Spanne der Einzelmessungen: so steht es auch in Apple Health
+    out.hrvSpan = [Math.min(...hrv), Math.max(...hrv), hrv.length];
   }
   const spo2 = index.window('spo2', from, to).v;
   if (spo2.length) {
     out.spo2 = mean(spo2);
+    out.spo2Span = [Math.min(...spo2), Math.max(...spo2), spo2.length];
     // Median für die Frühwarnung: robuster gegen einzelne Fehlmessungen als der Mittelwert
     out.spo2Med = median(spo2);
     out.spo2Min = Math.min(...spo2);
   }
   const resp = index.window('resp', from, to).v;
-  if (resp.length) out.resp = mean(resp);
+  if (resp.length) {
+    out.resp = mean(resp);
+    out.respSpan = [Math.min(...resp), Math.max(...resp), resp.length];
+  }
   const wt = index.window('wtemp', from, to).v;
   if (wt.length) out.temp = mean(wt);
   return out;
 }
 
-function dailyActivity(index, workoutsByDay, date, rhrRef, hrMax, p) {
+function dailyActivity(index, workoutsByDay, date, rhrRef, hrMax, p, jrec = null) {
   const out = {};
   const hr = index.picked('hr', date);
   if (hr?.t?.length) {
@@ -99,11 +107,20 @@ function dailyActivity(index, workoutsByDay, date, rhrRef, hrMax, p) {
   if (mass?.v?.length) out.mass = mass.v[mass.v.length - 1];
   const bt = index.picked('btemp', date);
   if (bt?.v?.length) out.btemp = Math.max(...bt.v);
-  out.workouts = (workoutsByDay.get(date) || []).map((w) => {
+  // Änderungen des Nutzers zuerst: gelöschte und zusammengelegte Einheiten fallen weg
+  // Als Stress markierte Abschnitte sind kein Training: ihr Anteil wird aus der Tageslast herausgerechnet
+  let stressTrimp = 0;
+  out.workouts = applyPatches(workoutsByDay.get(date) || [], jrec).map((w) => {
     const win = index.window('hr', w.t, w.e);
     const zm = win.t.length ? zoneMinutes(win.t, win.e, win.v, { rhr: rhrRef, hrMax, gapCapMin: p.gapCapMin, edges: p.zoneEdges }) : null;
-    return { ...w, trimp: zm ? edwardsTrimp(zm.zones) : null, avgHr: w.avgHr ?? (win.v.length ? mean(win.v) : null) };
+    const roh = zm ? edwardsTrimp(zm.zones) : null;
+    if (w.stress && isNum(roh)) stressTrimp += roh;
+    return { ...w, trimp: w.stress ? 0 : roh, avgHr: w.avgHr ?? (win.v.length ? mean(win.v) : null) };
   });
+  if (stressTrimp > 0 && isNum(out.trimp)) {
+    out.stressTrimp = Math.round(stressTrimp * 10) / 10;
+    out.trimp = Math.max(0, out.trimp - stressTrimp);
+  }
   return out;
 }
 
@@ -200,7 +217,7 @@ export function computeAll({ index, workouts = [], survey = new Map(), journal =
   for (const date of dates) {
     const d = days.get(date);
     const rhrRef = d.base.rhr?.median ?? globalRhr;
-    Object.assign(d, dailyActivity(index, workoutsByDay, date, rhrRef, hrMax, m.strain));
+    Object.assign(d, dailyActivity(index, workoutsByDay, date, rhrRef, hrMax, m.strain, journal.get(date) || null));
     // Abendcheck plus Logbuch: was im Logbuch steht, gilt (Training, Koffein, Wasser)
     d.answers = withJournal(d.survey?.a, journal.get(date), d.workouts);
     const tr = trainingFromSurvey(d.answers);

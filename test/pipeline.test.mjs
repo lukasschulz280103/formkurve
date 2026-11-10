@@ -108,3 +108,22 @@ test('Logbuch im Modell: Antworten aus dem Logbuch, Glück als Zielwert in den E
   assert.ok(caf && caf.diff > 5 && caf.confidence !== 'gering', 'eingebaute Effekte bleiben sichtbar');
   assert.equal(ins.counts.journal, demo.journal.size);
 });
+
+test('Nachtwerte tragen die Spanne der Einzelmessungen (wie Apple Health)', () => {
+  let geprueft = 0;
+  for (const d of res.days.values()) {
+    for (const [wert, span] of [[d.hrv, d.hrvSpan], [d.resp, d.respSpan], [d.spo2, d.spo2Span]]) {
+      if (wert == null || !span) continue;
+      const [lo, hi, n] = span;
+      assert.ok(n >= 1, 'Anzahl der Messungen');
+      assert.ok(lo <= wert + 1e-9 && wert <= hi + 1e-9, `${wert} liegt in ${lo}–${hi}`);
+      geprueft++;
+    }
+    // Ruhepuls: unser Wert ist das 10. Perzentil, liegt also im Nachtpuls-Bereich
+    if (d.rhr != null && d.hrSpan && d.rhrSource === 'Schlaf') {
+      assert.ok(d.hrSpan[0] <= d.rhr && d.rhr <= d.hrSpan[1]);
+      assert.ok(d.rhr <= (d.hrSpan[0] + d.hrSpan[1]) / 2, 'Ruhepuls liegt im ruhigen Teil der Nacht');
+    }
+  }
+  assert.ok(geprueft > 100, `nur ${geprueft} Spannen geprüft`);
+});

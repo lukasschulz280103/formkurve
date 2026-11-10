@@ -1,7 +1,8 @@
 // Ansicht "Verlauf": Tagesform, Recovery, Schlaf, Strain, Balance, HRV und Ruhepuls über die Zeit.
 import { html, useState } from '../vendor/preact-htm.js';
 import { state, openJournal } from './state.js';
-import { Topbar, DemoBanner } from './today.js';
+import { Topbar, DemoBanner, Card } from './today.js';
+import { WorkoutsCard, WorkoutSheet } from './workouts.js';
 import { TimeChart, Legend, DataTable } from './charts.js';
 import { Segmented } from './components.js';
 import { Icon } from './icons.js';
@@ -36,6 +37,7 @@ export function ChartCard({ id, title, sub, legend, children, table, info }) {
 
 export function TrendsView() {
   const [range, setRange] = useState(30);
+  const [openWk, setOpenWk] = useState(null);
   const settings = state.repo.settings;
   const all = state.results.dates;
   const dates = range ? all.slice(-range) : all;
@@ -159,6 +161,8 @@ export function TrendsView() {
         table=${{ dates, columns: [{ label: 'PM2,5', values: pm25, fmt: f1 }] }}>
         <${TimeChart} label="Feinstaub PM2,5" dates=${dates} refLines=${[{ y: 15 }]} yDomain=${[0, Math.max(20, ...pm25.filter((x) => x != null)) * 1.1]} series=${[{ key: 'pm', label: 'PM2,5', values: pm25, color: 'var(--ink)' }]} fmt=${f1} tickFmt=${f0} />
       <//>` : null}
+      <${WorkoutsCard} onOpen=${setOpenWk} full=${true} Card=${Card} />
+      ${openWk ? html`<${WorkoutSheet} item=${openWk} date=${openWk.date || state.date} onClose=${() => setOpenWk(null)} />` : null}
       ${state.repo.journal.size ? html`<section class="card row between" style="gap:12px">
         <div class="grow"><h3>Logbuch</h3><p class="small muted">Wasser, Koffein, Glück, Sport und Arbeit im Verlauf.</p></div>
         <button class="btn small" onClick=${() => openJournal(null, 'rueckblick')}><${Icon} name="book" size=${16} />Rückblick</button>

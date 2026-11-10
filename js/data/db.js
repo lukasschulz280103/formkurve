@@ -1,9 +1,10 @@
 // Kleine Hülle um IndexedDB. Ersatzspeicher im Arbeitsspeicher gibt es nur für Tests und die Vorschau:
 // In der echten App wäre ein stiller Wechsel gefährlich, weil neue Eingaben dann beim Schließen verloren gingen.
-export const STORES = ['raw', 'workouts', 'survey', 'context', 'kv', 'journal'];
+export const STORES = ['raw', 'workouts', 'survey', 'context', 'kv', 'journal', 'media'];
 // Version des Datenbank-Aufbaus. Neue Speicherbereiche werden beim Erhöhen nur ergänzt, nie gelöscht.
 // 1: bis Version 0.4 · 2: Version 0.5, Bereich „journal“ für das Logbuch
-export const DB_VERSION = 2;
+// 3: Version 0.13, Bereich „media“ für Bilder zu Trainings (bleiben auf dem Gerät)
+export const DB_VERSION = 3;
 
 let memoryFallback = typeof indexedDB === 'undefined';
 
