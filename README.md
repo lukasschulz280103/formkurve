@@ -8,29 +8,6 @@ Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. 
 
 GitHub Pages braucht die Datei `index.html` ganz oben im Repository. Liegt sie eine Ebene tiefer, zum Beispiel in einem Ordner `formkurve`, zeigt GitHub „404 File not found“.
 
-### Erstes Hochladen (Windows)
-
-1. Auf github.com ein kostenloses Konto anlegen und ein neues Repository erstellen, Name zum Beispiel `formkurve`, Sichtbarkeit **Public** (GitHub Pages ist nur für öffentliche Repositories kostenlos; der Code enthält keine persönlichen Daten).
-2. `formkurve-0.13.1.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
-3. Im Repository auf **Add file → Upload files** klicken.
-4. Im geöffneten Ordner **alles markieren** (Strg + A) und in das Upload-Feld ziehen. Nicht den Ordner selbst ziehen und nicht die ZIP-Datei.
-5. Warten, bis alle Dateien aufgelistet sind, dann unten **Commit changes**.
-6. Prüfen: In der Dateiliste des Repositorys steht `index.html` direkt neben `css`, `js` und `icons`.
-7. **Settings → Pages**: Source „Deploy from a branch“, Branch `main`, Ordner `/ (root)`, **Save**. Nach ein bis zwei Minuten erscheint oben „Your site is live at …“ mit **Visit site**. Diese Adresse in **Safari** auf dem iPhone öffnen, Teilen-Symbol → **Zum Home-Bildschirm**.
-8. Den Link an Freunde schicken; sie machen Schritt 7 auf ihrem iPhone.
-
-### Wenn GitHub „404 File not found“ zeigt
-
-- Im Repository liegt ein Ordner `formkurve` und darin erst `index.html`: Ordner öffnen, oben rechts **…** → **Delete directory** → **Commit changes**. Danach die Dateien wie oben hochladen.
-- Im Repository liegt `formkurve.zip`: Datei öffnen, **…** → **Delete file** → **Commit changes**. GitHub entpackt ZIP-Dateien nicht; also wie oben entpacken und den Inhalt hochladen.
-- Unter Settings → Pages ist ein anderer Ordner als `/ (root)` gewählt, etwa `/docs`: auf `/ (root)` stellen.
-- Die Adresse von Hand eingetippt: besser über **Visit site** öffnen; Groß- und Kleinschreibung im Pfad zählt.
-
-### Neue Version einspielen
-
-1. Neue ZIP entpacken, im Repository **Add file → Upload files**, wieder den gesamten Inhalt hineinziehen, **Commit changes**.
-2. Dateien mit gleichem Namen werden ersetzt. Nichts vorher löschen, nichts deaktivieren. Dateien, die eine neue Version nicht mehr braucht, schaden nicht. Die eigene Datei `sync-config.js` (Online-Konten) ist nie im ZIP und bleibt deshalb erhalten.
-3. Nach ein bis zwei Minuten lädt das iPhone beim nächsten Öffnen die neue Version. Die Nummer steht unter **Profil → Über Formkurve**. Das Symbol auf dem Home-Bildschirm bleibt, wie es ist.
 
 ## Deine Daten bei Updates
 
