@@ -2,7 +2,7 @@
 // Die Daten (IndexedDB) fasst der Service Worker nie an; ein Update ersetzt nur die App-Dateien.
 const VERSION = '0.13.1';
 const CACHE = `formkurve-${VERSION}`;
-const CORE = ['./', './index.html', './manifest.webmanifest', './css/app.css', './js/main.js', './icons/icon-180.png', './icons/icon.svg'];
+const CORE = ['./', './index.html', './manifest.webmanifest', './css/app.css', './app.js', './icons/icon-180.png', './icons/icon.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
