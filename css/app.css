@@ -1215,3 +1215,38 @@ button.card { -webkit-appearance: none; appearance: none; width: 100%; font: inh
   border: 0; display: grid; place-items: center; cursor: pointer;
   background: rgba(0, 0, 0, 0.6); color: #fff;
 }
+
+/* Rundgang: abgedunkelte Seite, Rahmen um das Ziel, Karte daneben */
+.tour { position: fixed; inset: 0; z-index: 90; }
+.tour-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.5); }
+.tour-ring {
+  position: absolute; border-radius: 14px; pointer-events: none;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.32), 0 0 0 4px color-mix(in srgb, var(--accent) 28%, transparent);
+  transition: top 0.18s ease, left 0.18s ease, width 0.18s ease, height 0.18s ease;
+}
+.tour-card {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  width: min(420px, calc(100vw - 32px));
+  display: grid; gap: 8px;
+  padding: 14px 16px 12px; border-radius: var(--r-lg);
+  background: var(--surface-1); border: 1px solid var(--line);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+.tour-card.mitte { top: 50%; transform: translate(-50%, -50%); }
+.tour-card h2 { font-size: 17px; margin: 0; }
+.tour-card p { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .tour-ring { transition: none; } }
+
+/* Ein Schalter, der gerade nicht geht */
+.switch.aus { opacity: 0.45; cursor: not-allowed; }
+
+/* Live-Werte eines verbundenen Geräts */
+.livegrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; }
+.live {
+  display: grid; justify-items: center; gap: 1px; padding: 10px 8px;
+  border-radius: var(--r-md); background: var(--surface-2); border: 1px solid var(--line);
+}
+.live-num { font-size: 26px; font-weight: 650; line-height: 1.1; }
+.live-unit { font-size: 11px; color: var(--muted); }
+.live-label { font-size: 12px; margin-top: 2px; }
