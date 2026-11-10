@@ -8,6 +8,7 @@ import { generateDemo } from '../demo/generate.js';
 import { todayKey, addDays, diffDays, dateKey } from '../core/time.js';
 import { setPath } from '../core/config.js';
 import { parseShortcutText } from '../import/shortcut.js';
+import { parseStravaCsv, looksLikeStrava } from '../import/strava.js';
 import { importHealthFile } from '../import/healthExport.js';
 import { fetchContext } from '../context/weather.js';
 import { currentPosition, permissionState, distanceKm } from '../context/location.js';
@@ -106,7 +107,9 @@ export function navigate(route, sub = null) {
     route = LEGACY[route][0];
   }
   if (!ROUTES.includes(route)) route = 'heute';
-  if (route !== 'profil' || !PROFILE_PAGES.includes(sub)) sub = null;
+  if (route === 'profil') sub = PROFILE_PAGES.includes(sub) ? sub : null;
+  else if (route === 'heute') sub = HOME_PAGES.includes(sub) ? sub : null;
+  else sub = null;
   const changed = state.route !== route || state.sub !== sub;
   if (changed || state.checkOpen) update({ route, sub, checkOpen: false });
   writeHash(true);
@@ -122,11 +125,17 @@ function writeHash(always) {
 }
 
 /** Liest „#profil/konto“ und ältere Formen wie „#daten“. */
+/** Karten, die sich als eigene Seite öffnen lassen. Muss zu js/ui/cards.js passen. */
+export const HOME_PAGES = ['contrib', 'hints', 'night', 'sleep', 'workouts', 'load', 'environment', 'periods'];
+
 export function parseRoute(hash) {
   const [r, s] = String(hash || '').replace(/^#/, '').split('/');
   if (LEGACY[r]) return { route: LEGACY[r][0], sub: LEGACY[r][1] };
   if (!ROUTES.includes(r)) return { route: 'heute', sub: null };
-  return { route: r, sub: r === 'profil' && PROFILE_PAGES.includes(s) ? s : null };
+  if (r === 'profil') return { route: r, sub: PROFILE_PAGES.includes(s) ? s : null };
+  // „#heute/schlaf“: eine Karte als ganze Seite
+  if (r === 'heute') return { route: r, sub: HOME_PAGES.includes(s) ? s : null };
+  return { route: r, sub: null };
 }
 
 export function openInfo(k, value = null, extra = {}) {
@@ -560,7 +569,27 @@ export function finishOnboarding(step) {
 // ---------- Daten ----------
 
 /** Import aus Kurzbefehl-Text (Zwischenablage oder Datei). */
+/** Trainings aus einem Strava-Export (activities.csv) übernehmen. */
+export async function importStravaCsv(text) {
+  const { workouts, stats } = parseStravaCsv(text);
+  if (!workouts.length) {
+    throw new Error(stats.rows ? 'Keine Trainings in der Datei gefunden. Nimm die activities.csv aus dem Strava-Export.' : 'Die Datei ist leer.');
+  }
+  update({ busy: 'Übernehme Strava-Trainings …' });
+  try {
+    const added = await state.repo.addSamples([], workouts);
+    const summary = { kind: 'strava', ...stats, parsed: stats.used, added, at: Date.now() };
+    await state.repo.finishImport(summary);
+    update({ lastImport: summary });
+    recompute();
+    return summary;
+  } finally {
+    update({ busy: null });
+  }
+}
+
 export async function importShortcutText(text) {
+  if (looksLikeStrava(text)) return importStravaCsv(text);
   const { samples, stats } = parseShortcutText(text);
   if (!samples.length) {
     update({ lastImport: { kind: 'shortcut', ...stats, at: Date.now(), added: 0 } });

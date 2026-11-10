@@ -1120,3 +1120,50 @@ button.card { -webkit-appearance: none; appearance: none; width: 100%; font: inh
 .zonebar .z5 { background: var(--strain); }
 .wk-row { width: 100%; display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 8px 0; background: none; border: 0; border-top: 1px solid var(--line); text-align: left; cursor: pointer; }
 .wk-row:first-of-type { border-top: 0; }
+
+/* Schlafphasen: Farben nah an der Health-App, in beiden Varianten lesbar */
+:root { --st-awake: #ff8a7a; --st-rem: #64d2ff; --st-core: #3b8cff; --st-deep: #5b57d8; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) { --st-awake: #e8604c; --st-rem: #0fb5e8; --st-core: #0a6ee0; --st-deep: #3f3ab8; }
+}
+:root[data-theme="light"] { --st-awake: #e8604c; --st-rem: #0fb5e8; --st-core: #0a6ee0; --st-deep: #3f3ab8; }
+
+.hypno { display: grid; gap: 3px; }
+.hypno .lane { display: grid; grid-template-columns: 42px minmax(0, 1fr); align-items: center; gap: 8px; }
+.hypno .lane-name { font-size: 11px; color: var(--muted); }
+.hypno .track { position: relative; height: 22px; border-radius: 6px; background: var(--surface-2); }
+.hypno .seg { position: absolute; top: 3px; height: 16px; border-radius: 5px; }
+.hypno .grid { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.hypno .axis .track { background: none; height: 16px; }
+.hypno .tick { position: absolute; top: 0; font-size: 10px; color: var(--muted); transform: translateX(-50%); white-space: nowrap; }
+.stagelist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; margin: 0; }
+.stagelist > div { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.stagelist dt { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
+.stagelist dt i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+.stagelist dd { margin: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+.nightchart, .rangechart { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 8px; align-items: stretch; }
+.nightchart svg, .rangechart .bars { grid-column: 2; min-width: 0; }
+.nightchart svg { width: 100%; height: 150px; display: block; }
+.nightchart .axis-y, .rangechart .axis-y { display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.nightchart .ticks, .rangechart .ticks { grid-column: 2; display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+.nightchart .tiny { grid-column: 1 / -1; margin: 2px 0 0; }
+.rangechart .bars { position: relative; display: flex; align-items: flex-end; gap: 2px; }
+.rangechart .bar { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; background: none; border: 0; padding: 0; cursor: pointer; position: relative; }
+.rangechart .bar i { display: block; width: 100%; }
+.rangechart .bar i:first-child { border-radius: 3px 3px 0 0; }
+.rangechart .dots .dot { position: absolute; left: 50%; width: 6px; height: 6px; margin-left: -3px; border-radius: 999px; background: var(--accent); }
+.rangechart .median { position: absolute; left: 0; right: 0; height: 1px; background: var(--ink-2); opacity: 0.5; }
+.sheet.night { gap: 11px; }
+.wk-list { display: grid; }
+.wk-item { display: flex; justify-content: space-between; gap: 12px; align-items: center; width: 100%; padding: 9px 0; background: none; border: 0; border-top: 1px solid var(--line); text-align: left; cursor: pointer; }
+.wk-item:first-child { border-top: 0; padding-top: 0; }
+.wk-when { display: grid; min-width: 0; }
+.wk-when .muted { font-size: 12px; }
+.wk-num { display: grid; justify-items: end; flex: none; }
+.wk-num .muted { font-size: 12px; }
+.vital .range.as-link { background: none; border: 0; padding: 0; width: 100%; text-align: left; cursor: pointer; }
+.vital .range.as-link .note { display: inline-flex; align-items: center; gap: 2px; }
+.zoom { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); cursor: pointer; }
+.zoom:hover { color: var(--ink); }
+.card-head h2 { min-width: 0; }

@@ -111,6 +111,18 @@ export function sleepCode(value) {
   return SLEEP.ASLEEP;
 }
 
+/** Strecke in Kilometer, aus km, m, mi, ft oder yd. Unbrauchbares wird zu null. */
+export function distanceKm(value, unit = 'km') {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const u = String(unit || 'km').trim().toLowerCase();
+  const km = u === 'm' ? value / 1000
+    : u === 'mi' || u.startsWith('mile') ? value * 1.609344
+    : u === 'ft' ? value * 0.0003048
+    : u === 'yd' ? value * 0.0009144
+    : value;
+  return km > 0 && km < 1000 ? Math.round(km * 1000) / 1000 : null;
+}
+
 /** Plausibler Messbereich je Typ. Werte außerhalb sind Messfehler und werden verworfen. */
 export const LIMITS = {
   hr: [30, 230],

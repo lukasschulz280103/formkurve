@@ -149,6 +149,60 @@ export function DetectCard({ date }) {
   </section>`;
 }
 
+/** Alle Einheiten der letzten Tage, gemessen wie eingetragen, neueste zuerst. */
+export function recentWorkouts(results, repo, today, n = 12) {
+  const out = [];
+  for (let i = 0; i < 90 && out.length < n * 3; i++) {
+    const date = addDays(today, -i);
+    const d = results?.days?.get(date);
+    if (!d) continue;
+    for (const w of d.workouts || []) out.push({ ...w, date, quelle: w.src || 'Messung' });
+    for (const e of J.entriesOf(repo.journal?.get(date), 'sport')) {
+      const m = toMinutes(e.at);
+      const base = new Date(`${date}T00:00:00`).getTime();
+      // Eingetragene Einheiten, die zu einer gemessenen passen, stehen nicht doppelt
+      const t = base + (isNum(m) ? m : 12 * 60) * MIN;
+      if (out.some((w) => w.date === date && Math.abs(w.t - t) < 45 * MIN)) continue;
+      out.push({ t, durMin: e.min, kind: e.kind, sport: e.sport, km: e.km ?? null, rpe: e.rpe ?? null, date, quelle: 'Logbuch', eigen: true });
+    }
+  }
+  return out.sort((a, b) => b.t - a.t).slice(0, n);
+}
+
+const tempo = (w) => {
+  if (!isNum(w.km) || w.km <= 0 || !isNum(w.durMin)) return null;
+  const sport = w.sport || w.kind;
+  if (['radfahren', 'ski', 'rudern'].includes(sport)) return `${num(w.km / (w.durMin / 60), 1)} km/h`;
+  const sec = (w.durMin * 60) / w.km;
+  return `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')} min/km`;
+};
+
+/** Karte „Letzte Trainings“: alles auf einen Blick, Tippen öffnet die Zusammenfassung. */
+export function WorkoutsCard({ onOpen, full = false, Card }) {
+  const repo = state.repo;
+  const alle = useMemo(() => recentWorkouts(state.results, repo, state.today, full ? 40 : 12), [state.version, state.journalVersion, full]);
+  const list = full ? alle : alle.slice(0, 4);
+  if (!list.length) return null;
+  const woche = alle.filter((w) => w.date > addDays(state.today, -7));
+  const kmWoche = woche.reduce((s, w) => s + (isNum(w.km) ? w.km : 0), 0);
+  const minWoche = woche.reduce((s, w) => s + (w.durMin || 0), 0);
+  const kopf = html`<span class="tiny muted tnum">7 Tage: ${num(Math.round(minWoche))} min${kmWoche > 0 ? ` · ${num(kmWoche, 1)} km` : ''}</span>`;
+  return html`<${Card} id="workouts" full=${full} title="Letzte Trainings" sub=${kopf}>
+    <div class="wk-list">
+      ${list.map((w) => html`<button type="button" class="wk-item" key=${`${w.t}-${w.quelle}`} onClick=${() => onOpen(w)}>
+        <span class="wk-when"><b>${sportLabel(w.sport || w.kind)}</b>
+          <span class="muted">${new Date(w.date + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })} · ${clock(w.t)}</span></span>
+        <span class="wk-num tnum">
+          <b>${hours(w.durMin)}</b>
+          <span class="muted">${[isNum(w.km) && w.km > 0 ? `${num(w.km, 2)} km` : null, tempo(w), isNum(w.avgHr) ? `Ø ${num(w.avgHr)}` : null, isNum(w.kcal) && w.kcal > 0 ? `${num(w.kcal)} kcal` : null].filter(Boolean).join(' · ') || w.quelle}</span>
+        </span>
+      </button>`)}
+    </div>
+    ${full ? html`<p class="tiny muted" style="margin-top:8px">Gemessenes und selbst Eingetragenes zusammen. Kilometer kommen aus Apple Health oder Strava; wo das Band keine Strecke liefert, bleibt die Spalte leer.</p>` : null}
+    ${!full && alle.length > list.length ? html`<p class="tiny muted" style="margin-top:6px">${alle.length - list.length} weitere in der Seitenansicht.</p>` : null}
+  <//>`;
+}
+
 const ZONE_LABEL = ['Erholung', 'Grundlage', 'Fettstoffwechsel', 'Tempo', 'Schwelle', 'Maximal'];
 
 /** Zusammenfassung eines Trainings: Zeiten, Puls, Zonen, Schritte, Energie. */
@@ -189,6 +243,8 @@ export function WorkoutSheet({ item, date, onClose }) {
         ${isNum(item.maxHr) ? html`<dt>Höchster Puls</dt><dd>${num(item.maxHr)} bpm</dd>` : null}
         ${isNum(detail.steps) ? html`<dt>Schritte</dt><dd>${num(detail.steps)}</dd>` : null}
         ${isNum(item.kcal) && item.kcal > 0 ? html`<dt>Energie</dt><dd>${num(item.kcal)} kcal</dd>` : null}
+        ${isNum(item.km) && item.km > 0 ? html`<dt>Strecke</dt><dd>${num(item.km, 2)} km</dd>` : null}
+        ${tempo(item) ? html`<dt>Tempo</dt><dd>${tempo(item)}</dd>` : null}
         ${isNum(item.trimp) ? html`<dt>Last dieser Einheit</dt><dd>${num(item.trimp)}</dd>` : null}
       </dl>
       ${gesamt > 0 ? html`<div>

@@ -3,7 +3,7 @@ import { html } from '../vendor/preact-htm.js';
 import { state, useAppState, navigate, update } from './state.js';
 import { Icon } from './icons.js';
 import { Progress } from './components.js';
-import { TodayView } from './today.js';
+import { HomeCardPage, TodayView } from './today.js';
 import { MonthView } from './calendarView.js';
 import { TrendsView } from './trends.js';
 import { CheckSheet, CheckFab } from './checkin.js';
@@ -22,6 +22,7 @@ const TABS = [
 
 /** „Heute“ zeigt entweder den Tag oder den Monatskalender. */
 function HomeView() {
+  if (state.sub) return html`<${HomeCardPage} id=${state.sub} />`;
   return state.homeView === 'month' ? html`<${MonthView} />` : html`<${TodayView} />`;
 }
 

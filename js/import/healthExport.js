@@ -2,7 +2,7 @@
 // ohne die ganze Datei in den Speicher zu laden.
 import { Unzip, UnzipInflate } from '../vendor/fflate.js';
 import { parseLooseDate } from '../core/time.js';
-import { typeFromHK, normalizeValue, decodeEntities, workoutKind } from '../data/normalize.js';
+import { typeFromHK, normalizeValue, decodeEntities, workoutKind, distanceKm } from '../data/normalize.js';
 import { countReject } from './shortcut.js';
 
 /** Scanner für den XML-Text: erkennt <Record>, <Workout> und <WorkoutStatistics>. */
@@ -65,6 +65,7 @@ export function createXmlScanner({ sinceMs = 0, onSample, onWorkout }) {
       avgHr: null,
       maxHr: null,
       kcal: Number(attr(b, lt, gt, 'totalEnergyBurned')) || null,
+      km: distanceKm(Number(attr(b, lt, gt, 'totalDistance')), attr(b, lt, gt, 'totalDistanceUnit')),
       src: decodeEntities(attr(b, lt, gt, 'sourceName') || 'Unbekannt'),
     };
   }
@@ -77,6 +78,9 @@ export function createXmlScanner({ sinceMs = 0, onSample, onWorkout }) {
     } else if (ty === 'HKQuantityTypeIdentifierActiveEnergyBurned') {
       const s = Number(attr(b, lt, gt, 'sum'));
       if (s) workout.kcal = s;
+    } else if (/Distance(WalkingRunning|Cycling|Swimming|Wheelchair|DownhillSnowSports)/.test(ty || '')) {
+      const km = distanceKm(Number(attr(b, lt, gt, 'sum')), attr(b, lt, gt, 'unit'));
+      if (km) workout.km = km;
     }
   }
 

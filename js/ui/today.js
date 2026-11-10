@@ -11,7 +11,8 @@ import { addDays } from '../core/time.js';
 import { summarize, formGap } from '../model/hints.js';
 import { cardOn, withCard } from './cards.js';
 import { explainNight } from '../model/lifestyle.js';
-import { DetectCard, WorkoutSheet } from './workouts.js';
+import { DetectCard, WorkoutSheet, WorkoutsCard } from './workouts.js';
+import { NightSheet } from './nightView.js';
 import { sportLabel } from '../model/sports.js';
 import { earlyWarnings, snoozedWarnings, snoozeWarning } from '../model/earlywarning.js';
 import { dataReport, dataAlert } from '../model/coverage.js';
@@ -43,9 +44,9 @@ export function HomeSwitch() {
 }
 
 /** Kopfzeile einer Unterseite im Reiter „Profil“ mit Zurück-Knopf. */
-export function SubTopbar({ title, sub }) {
+export function SubTopbar({ title, sub, back = 'profil', backLabel = 'Zurück zum Profil' }) {
   return html`<header class="topbar">
-    <button type="button" class="iconbtn" aria-label="Zurück zum Profil" onClick=${() => navigate('profil')}><${Icon} name="left" /></button>
+    <button type="button" class="iconbtn" aria-label=${backLabel} onClick=${() => navigate(back)}><${Icon} name="left" /></button>
     <div class="grow">
       <h1>${title}</h1>
       ${sub ? html`<div class="sub">${sub}</div>` : null}
@@ -99,7 +100,7 @@ function rangeOf(base, floor, transform = (x) => x) {
   return [transform(base.median - s), transform(base.median + s)];
 }
 
-function Vital({ name, k, value, unit, digits = 0, range, z }) {
+function Vital({ name, k, value, unit, digits = 0, range, z, onOpen = null }) {
   if (value == null) return null;
   const lo = range?.[0];
   const hi = range?.[1];
@@ -111,7 +112,9 @@ function Vital({ name, k, value, unit, digits = 0, range, z }) {
   return html`<div class="vital">
     <div class="name row" style="gap:4px">${name}<${InfoButton} k=${k} value=${value} label=${name} /></div>
     <div class="value">${num(value, digits)}<small>${unit}</small></div>
-    <div class="range"><${RangeBar} value=${value} lo=${lo} hi=${hi} min=${min} max=${max} /><span class="note">${note}</span></div>
+    ${onOpen ? html`<button type="button" class="range as-link" onClick=${onOpen} aria-label=${`Verlauf von ${name} ansehen`}>
+      <${RangeBar} value=${value} lo=${lo} hi=${hi} min=${min} max=${max} /><span class="note">${note} <${Icon} name="right" size=${12} /></span></button>`
+      : html`<div class="range"><${RangeBar} value=${value} lo=${lo} hi=${hi} min=${min} max=${max} /><span class="note">${note}</span></div>`}
   </div>`;
 }
 
@@ -155,7 +158,7 @@ function ProfileHint() {
 }
 
 /** Tagesform je Woche oder Monat im Durchschnitt. */
-function FormPeriods() {
+function FormPeriods({ full = false }) {
   const s = state.repo.settings;
   const unit = s.display.formPeriod === 'month' ? 'month' : 'week';
   const [table, setTable] = useState(false);
@@ -165,24 +168,21 @@ function FormPeriods() {
   const { red, green } = s.model.recovery;
   const word = unit === 'week' ? 'Woche' : 'Monat';
   const head = sum.current.partial ? `${unit === 'week' ? 'Diese Woche' : 'Dieser Monat'} (${sum.current.label})` : sum.current.label;
-  return html`<section class="card" aria-labelledby="h-periods">
-    <div class="card-head">
-      <h2 id="h-periods" class="row" style="gap:4px">Tagesform im Schnitt<${InfoButton} k="form" value=${sum.current.mean} label="Tagesform" /></h2>
-      <button class="btn small ghost" aria-pressed=${table ? 'true' : 'false'} onClick=${() => setTable(!table)}><${Icon} name="table" size=${16} />${table ? 'Diagramm' : 'Tabelle'}</button>
-    </div>
-    <${Segmented} label="Zusammenfassen nach" value=${unit} onChange=${(v) => patchSettings('display.formPeriod', v)} options=${[{ value: 'week', label: 'Wochen' }, { value: 'month', label: 'Monate' }]} />
+  return html`<${Card} id="periods" full=${full} title="Tagesform im Schnitt"
+    sub=${full ? html`<button class="btn small ghost" aria-pressed=${table ? 'true' : 'false'} onClick=${() => setTable(!table)}><${Icon} name="table" size=${16} />${table ? 'Diagramm' : 'Tabelle'}</button>` : null}>
+    ${full ? html`<${Segmented} label="Zusammenfassen nach" value=${unit} onChange=${(v) => patchSettings('display.formPeriod', v)} options=${[{ value: 'week', label: 'Wochen' }, { value: 'month', label: 'Monate' }]} />` : null}
     <div class="period-stat">
       <div><div class="tiny muted">${head}</div><div class="big">${num(sum.current.mean)}</div></div>
       ${sum.delta != null ? html`<span class="delta">${signed(sum.delta)} ${unit === 'week' ? 'zur Vorwoche' : 'zum Vormonat'}</span>` : null}
       <span class="tiny muted">${sum.current.n} ${sum.current.n === 1 ? 'Tag' : 'Tage'} mit Wert</span>
     </div>
-    ${table ? html`<div class="tablewrap"><table class="data">
+    ${!full ? null : table ? html`<div class="tablewrap"><table class="data">
         <thead><tr><th>${word}</th><th>Zeitraum</th><th>Ø</th><th>Tage</th><th>Spanne</th></tr></thead>
         <tbody>${periods.slice().reverse().map((p) => html`<tr><td>${p.label}${p.partial ? ' (läuft)' : ''}</td><td>${p.range}</td><td>${p.mean == null ? '–' : num(p.mean)}</td><td>${p.n}</td><td>${p.n > 1 ? `${num(p.min)}–${num(p.max)}` : '–'}</td></tr>`)}</tbody>
       </table></div>`
       : html`<${PeriodChart} periods=${periods} yDomain=${[0, 100]} yTicks=${[0, red, green, 100]} refLines=${[]} unitWord=${word} label=${`Durchschnittliche Tagesform je ${word}`} />`}
-    <p class="tiny muted" style="margin-top:6px">Linien bei ${red} und ${green}: ab ${green} „Bereit“, unter ${red} „Erholung zuerst“. Die helle Säule läuft noch.</p>
-  </section>`;
+    ${full ? html`<p class="tiny muted" style="margin-top:6px">Linien bei ${red} und ${green}: ab ${green} „Bereit“, unter ${red} „Erholung zuerst“. Die helle Säule läuft noch.</p>` : null}
+  <//>`;
 }
 
 /**
@@ -246,17 +246,19 @@ function DataAlert() {
 }
 
 /** Warum ein Nachtwert heute aus dem Rahmen fällt – mit der bekannten Ursache, wenn es eine gibt. */
-function NightReason({ d, prev }) {
+function NightReason({ d, prev, full = false }) {
   const { odd, causes } = explainNight(d, prev, state.repo.settings);
   if (!odd.length) return null;
   const werte = odd.map((o) => `${o.label} ${o.dir} deinem Schnitt`).join(', ');
   if (!causes.length) {
     return html`<p class="small ink2" style="margin-top:8px">${werte.charAt(0).toUpperCase() + werte.slice(1)}. Im Logbuch steht nichts, was das erklärt.</p>`;
   }
+  // Kompakt reicht der Grund in einem Satz; die Einzelheiten stehen auf der Seite
+  const text = full ? causes.map((c) => c.text).join(' ') : causes.map((c) => c.label).join(' und ');
   return html`<div class="hint c-info" style="margin-top:8px">
     <${Icon} name="info" size=${18} />
-    <div><b>${werte.charAt(0).toUpperCase() + werte.slice(1)}.</b> ${causes.map((c) => c.text).join(' ')}
-      <span class="tiny muted"> Die Frühwarnung rechnet das mit ein.</span></div>
+    <div><b>${werte.charAt(0).toUpperCase() + werte.slice(1)}.</b> ${full ? text : `Möglicher Grund: ${text.toLowerCase()}.`}
+      ${full ? html`<span class="tiny muted"> Die Frühwarnung rechnet das mit ein.</span>` : null}</div>
   </div>`;
 }
 
@@ -272,6 +274,147 @@ function NeedParts({ d }) {
   ].filter(Boolean);
   if (!teile.length) return null;
   return html`<p class="tiny muted" style="margin-top:8px">Bedarf ${hours(d.sleepNeedH * 60)} = ${hours(p.base * 60)} Grundbedarf + ${teile.join(' + ')}.</p>`;
+}
+
+/**
+ * Hülle jeder Karte auf „Heute“: Titel, Zusatz rechts und oben in der Ecke ein Knopf,
+ * der denselben Inhalt als ganze Seite öffnet. Auf der Seite fehlt der Knopf.
+ */
+function Card({ id, title, sub, full, children, label = null }) {
+  return html`<section class="card" aria-label=${label || title}>
+    <div class="card-head">
+      <h2>${title}</h2>
+      <div class="row" style="gap:8px;align-items:center">
+        ${sub || null}
+        ${full ? null : html`<button type="button" class="zoom" onClick=${() => navigate('heute', id)} aria-label=${`${title} als ganze Seite öffnen`}>
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>`}
+      </div>
+    </div>
+    ${children}
+  </section>`;
+}
+
+/** Letzte Nacht. Kurz: die zwei Werte, die die Recovery tragen, plus Auffälligkeiten. */
+function NightCard({ d, prev, onNight, full = false }) {
+  const leer = d.hrv == null && d.rhr == null;
+  const vitals = [
+    ['HRV', 'hrv', d.hrv, 'ms', 0, rangeOf(d.base?.lnHrv, 0.06, Math.exp), d.z?.hrv, 'hrv'],
+    [`Ruhepuls${d.rhrSource === 'Apple Health' ? ' (Apple Health)' : ''}`, 'rhr', d.rhr, 'bpm', 0, rangeOf(d.base?.rhr, 1.5), d.z?.rhr, 'rhr'],
+    ['Atemfrequenz', 'resp', d.resp, '/min', 1, rangeOf(d.base?.resp, 0.4), d.z?.resp, 'resp'],
+    ['Blutsauerstoff', 'spo2', d.spo2, '%', 1, rangeOf(d.base?.spo2, 0.7), d.z?.spo2, 'spo2'],
+    ['Hauttemperatur', 'temp', d.temp, '°C', 1, rangeOf(d.base?.temp, 0.15), d.z?.temp, null],
+  ];
+  const zeigen = full ? vitals : vitals.slice(0, 2);
+  return html`<${Card} id="night" full=${full} title="Letzte Nacht"
+    sub=${d.sleep ? html`<span class="tiny muted tnum">${clock(d.sleep.onset)}–${clock(d.sleep.wake)}</span>` : null}>
+    <div class="vitals">
+      ${zeigen.map(([name, k, value, unit, digits, range, z, metric]) => html`<${Vital} key=${k} name=${name} k=${k} value=${value}
+        unit=${unit} digits=${digits} range=${range} z=${z} onOpen=${metric ? () => onNight(metric) : null} />`)}
+    </div>
+    ${leer ? html`<p class="small muted">Keine Nachtwerte. Prüfe, ob Zepp HRV und Herzfrequenz an Apple Health schreibt. <${HideCard} id="night" /></p>` : null}
+    <${NightReason} d=${d} prev=${prev} full=${full} />
+    ${full ? html`<p class="tiny muted" style="margin-top:8px">Tippe auf einen Balken für den Verlauf der Nacht. Der graue Balken ist dein persönlicher Normalbereich, das (i) zeigt die allgemeinen Richtwerte.</p>` : null}
+  <//>`;
+}
+
+/** Schlaf. Kurz: Dauer und was zum Bedarf fehlt. */
+function SleepCard({ d, onNight, full = false }) {
+  const s = d.sleep;
+  const fehlt = d.sleepDebtH > 0.1;
+  return html`<${Card} id="sleep" full=${full} title="Schlaf"
+    sub=${html`<span class="tiny muted row" style="gap:2px">Bedarf ${hours(d.sleepNeedH * 60)}<${InfoButton} k="sleepNeed" value=${d.sleepNeedH} label="Schlafbedarf" /></span>`}>
+    <dl class="kv">
+      <${KV} label="Geschlafen" value=${hours(s.asleepMin)} k="asleep" infoValue=${s.asleepMin} />
+      ${fehlt ? html`<${KV} label="Fehlt zum Bedarf" value=${hours(d.sleepDebtH * 60)} />` : null}
+      ${full ? html`
+        <${KV} label="Effizienz" value=${`${num(s.efficiency * 100)} %`} k="efficiency" infoValue=${s.efficiency} />
+        ${s.hasStages ? html`<${KV} label="Tiefschlaf" value=${`${hours(s.deepMin)} · ${num(s.deepPct * 100)} %`} k="deep" infoValue=${s.deepMin} extra=${{ pct: s.deepPct }} />
+          <${KV} label="REM" value=${`${hours(s.remMin)} · ${num(s.remPct * 100)} %`} k="rem" infoValue=${s.remMin} extra=${{ pct: s.remPct }} />` : null}
+        ${s.latencyMin != null ? html`<${KV} label="Eingeschlafen nach" value=${`${num(s.latencyMin)} min`} k="latency" infoValue=${s.latencyMin} />` : null}
+        <${KV} label="Aufwachphasen" value=${s.wakeEpisodes} k="wake" infoValue=${s.wakeEpisodes} />
+        ${d.sleepParts?.regularity != null ? html`<${KV} label="Regelmäßigkeit (7 Tage)" value=${`${num(d.sleepParts.regularity)} / 100`} k="regularity" infoValue=${d.sleepParts.regularity} />` : null}
+        ${d.sleepParts?.calm != null ? html`<${KV} label="Nächtliche Ruhe" value=${`${num(d.sleepParts.calm)} / 100`} />` : null}` : null}
+    </dl>
+    ${full ? html`<${NeedParts} d=${d} />` : null}
+    ${d.sleepParts?.calm != null && d.sleepScore >= 70 && d.sleepParts.calm <= 45 ? html`<p class="small ink2" style="margin-top:8px">
+      Lang und durchgehend geschlafen, aber unruhig: Puls und HRV lagen schlechter als sonst.${full ? ' Deshalb kann der Schlaf-Score hoch und die Recovery trotzdem niedrig sein.' : ''}</p>` : null}
+    <div class="row" style="margin-top:8px"><button type="button" class="linkbtn" onClick=${() => onNight('sleep')}>Phasen ansehen</button></div>
+  <//>`;
+}
+
+/** Belastung. Kurz: Last und Schritte. */
+function LoadCard({ d, date, onOpen, full = false }) {
+  const wkKcal = (d.workouts || []).reduce((s, w) => s + (w.kcal > 0 ? w.kcal : 0), 0);
+  let active7 = null;
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i < 7; i++) {
+    const x = state.results.days.get(addDays(date, -i));
+    if (x?.activeMin != null) {
+      sum += x.activeMin;
+      n++;
+    }
+  }
+  if (n >= 4) active7 = (sum * 7) / n;
+  const leer = d.load == null && !d.workouts?.length;
+  return html`<${Card} id="load" full=${full} title="Belastung">
+    <dl class="kv">
+      ${d.load != null ? html`<${KV} label=${d.strainPartial ? 'Last bisher' : 'Last'} value=${num(d.load)} k="load" infoValue=${d.load} />` : null}
+      ${d.steps != null ? html`<${KV} label="Schritte" value=${num(d.steps)} k="steps" infoValue=${d.steps} />` : null}
+      ${full ? html`
+        ${d.strengthLoad > 0 ? html`<${KV} label="davon Kraft-Zuschlag" value=${`+${num(d.strengthLoad)}`} />` : null}
+        ${active7 != null ? html`<${KV} label="Aktivminuten (7 Tage)" value=${num(active7)} k="activeMin" infoValue=${active7} />` : null}
+        ${d.acwr != null ? html`<${KV} label="7 zu 28 Tage" value=${num(d.acwr, 2)} k="acwr" infoValue=${d.acwr} />` : null}
+        ${d.energy != null ? html`<${KV} label=${d.strainPartial ? 'Aktive Energie bisher' : 'Aktive Energie'} value=${`${num(d.energy)} kcal`} />` : null}
+        ${wkKcal > 0 ? html`<${KV} label="davon im Training" value=${`${num(wkKcal)} kcal`} />` : null}
+        ${d.fitness != null ? html`<${KV} label="Langzeit-Fitness" value=${num(d.fitness)} k="fitness" infoValue=${d.fitness} />` : null}` : null}
+    </dl>
+    ${full && d.workouts?.length ? html`<hr class="divider" />${d.workouts.map((w, i) => html`<button type="button" class="wk-row small" key=${i} onClick=${() => onOpen(w)}>
+      <span><b>${sportLabel(w.sport || w.kind) || WORKOUT_LABEL[w.kind] || 'Training'}</b> <span class="muted">${clock(w.t)} · ${num(w.durMin)} min</span></span>
+      <span class="muted tnum row" style="gap:6px">${[w.kcal > 0 ? `${num(w.kcal)} kcal` : '', w.avgHr ? `Ø ${num(w.avgHr)} bpm` : ''].filter(Boolean).join(' · ')}
+        <${Icon} name="right" size=${15} /></span></button>`)}` : null}
+    ${full && d.energy != null ? html`<p class="tiny muted" style="margin-top:8px">Aktive Energie ohne Grundumsatz, so wie Apple Health sie zählt.</p>` : null}
+    ${leer ? html`<p class="small muted">Keine Pulsdaten für diesen Tag. <${HideCard} id="load" /></p>` : null}
+  <//>`;
+}
+
+/** Was die Werte bewegt. Kurz: die drei stärksten Anteile und die Summe aus dem Logbuch. */
+function ContribCard({ d, contrib, full = false }) {
+  const lf = d.lifestyle;
+  if (!contrib.length && !lf?.reasons?.length) return null;
+  const items = full ? contrib : contrib.slice(0, 3);
+  return html`<${Card} id="contrib" full=${full} title="Was deine Werte bewegt" sub=${html`<span class="tiny muted">Punkte</span>`}>
+    ${items.length ? html`<${Contributions} items=${items} />` : null}
+    ${full && contrib.length ? html`<p class="tiny muted" style="margin-top:10px">Recovery gegenüber einem Tag, an dem alles genau deinem Normalwert entspricht (Recovery 50).</p>` : null}
+    ${full && d.formParts?.length ? html`<hr class="divider" />
+      <div class="card-head" style="margin-bottom:6px"><h3 style="font-size:15px;margin:0">Woraus die Tagesform entsteht</h3><span class="tnum small muted">${num(d.formRaw)}</span></div>
+      <dl class="kv">
+        ${d.formParts.filter((x) => x.value != null).map((x) => html`<dt key=${`t${x.id}`}>${x.label} <span class="muted">${num(x.weight * 100)} %</span></dt><dd key=${`v${x.id}`}>${num(x.value)}</dd>`)}
+      </dl>` : null}
+    ${d.formCap != null ? html`<p class="small warn-ink" style="margin-top:6px">Gedeckelt auf ${num(d.formCap)}: Bei einer Recovery von ${num(d.recovery)} sollen Fitness und Belastungsbalance den Tag nicht hochziehen.</p>` : null}
+    ${lf?.reasons?.length ? html`${full ? html`<hr class="divider" />` : null}
+      <div class="card-head" style="margin:6px 0"><h3 style="font-size:15px;margin:0">Dazu aus dem Logbuch</h3>
+        <span class="tnum small" style=${`color:var(--${lf.delta < 0 ? 'crit' : 'good'})`}>${lf.delta > 0 ? '+' : lf.delta < 0 ? '−' : ''}${num(Math.abs(lf.delta))} auf die Tagesform</span></div>
+      <ul class="bullets small">${(full ? lf.reasons : lf.reasons.slice(0, 2)).map((r) => html`<li key=${r.id}>${r.text} <span class="muted tnum">(${r.points > 0 ? '+' : '−'}${num(Math.abs(r.points))})</span></li>`)}</ul>
+      ${full ? html`<p class="tiny muted" style="margin-top:6px">Alkohol, Koffein und Wasser stecken zum Teil schon in HRV, Puls und Schlaf. Deshalb zählt das Logbuch nur mit wenigen Punkten dazu, höchstens ${num(state.repo.settings.model.form.lifestyle.cap)} nach unten.</p>` : null}` : null}
+  <//>`;
+}
+
+/** Hinweise. Kurz: nur Warnungen, höchstens zwei. */
+function HintsCard({ d, full = false }) {
+  const alle = d.hints || [];
+  if (!alle.length) return null;
+  const wichtig = alle.filter((h) => h.level !== 'info');
+  const zeigen = full ? alle : (wichtig.length ? wichtig : alle).slice(0, 2);
+  const rest = alle.length - zeigen.length;
+  return html`<${Card} id="hints" full=${full} title="Hinweise des Tages" label="Hinweise">
+    ${zeigen.map((h) => html`<div key=${h.title} class=${`hint ${{ critical: 'c-crit', warning: 'c-warn', info: 'c-info' }[h.level]}`}>
+      <${Icon} name=${h.level === 'info' ? 'info' : 'alert'} size=${20} />
+      <div><b>${h.title}</b>${full ? html`<p>${h.text}</p>` : null}</div>
+    </div>`)}
+    ${rest > 0 ? html`<p class="tiny muted" style="margin-top:6px">${rest} weitere${rest === 1 ? 'r Hinweis' : ' Hinweise'} in der Seitenansicht.</p>` : null}
+  <//>`;
 }
 
 /** Blendet eine Karte aus, die für diesen Tag nichts zu zeigen hat. */
@@ -316,7 +459,7 @@ function BackupHint() {
   </section>`;
 }
 
-function Environment({ date }) {
+function Environment({ date, full = false }) {
   const s = state.repo.settings;
   const today = state.repo.context.get(date) || null;
   const night = state.repo.context.get(addDays(date, -1)) || null;
@@ -339,24 +482,77 @@ function Environment({ date }) {
     return html`<section class="card stack"><h2>Umwelt</h2><p class="small muted">${state.contextStatus || 'Noch keine Umweltdaten für diesen Tag.'}</p></section>`;
   }
   const pm = today?.pm25;
-  return html`<section class="card">
-    <div class="card-head"><h2>Umwelt</h2><span class="tiny muted" style="text-align:right">${formatPlace(s.context.place)}</span></div>
+  // Kompakt nur, was die Nacht betrifft, und Werte, die auffallen
+  const warm = night?.nightTempMin != null && night.nightTempMin >= 20;
+  const dreck = pm != null && pm > 15;
+  const pollen = today?.pollenMax != null && today.pollenMax >= 50;
+  return html`<${Card} id="environment" full=${full} title="Umwelt"
+    sub=${html`<span class="tiny muted" style="text-align:right">${formatPlace(s.context.place)}</span>`}>
     <dl class="kv">
-      ${night?.nightTempMin != null ? html`<${KV} label="Nacht, Tiefstwert" value=${`${num(night.nightTempMin, 1)} °C`} k="nightTemp" infoValue=${night.nightTempMin} />` : null}
-      ${night?.nightHumidity != null ? html`<${KV} label="Luftfeuchte nachts" value=${`${num(night.nightHumidity)} %`} k="humidity" infoValue=${night.nightHumidity} />` : null}
-      ${today?.tMax != null ? html`<${KV} label="Höchstwert heute" value=${`${num(today.tMax, 1)} °C`} k="dayTemp" infoValue=${today.tMax} />` : null}
-      ${pm != null ? html`<${KV} label="Feinstaub PM2,5" value=${html`${num(pm, 1)} µg/m³ <span class=${`status ${pm > 15 ? 'c-warn' : 'c-good'}`} style="padding:1px 8px;font-size:11px;margin-left:4px">${pm > 15 ? 'über WHO' : 'unter WHO'}</span>`} k="pm25" infoValue=${pm} />` : null}
-      ${today?.pollenMax != null ? html`<${KV} label="Pollen (Spitze)" value=${`${num(today.pollenMax)} /m³`} k="pollen" infoValue=${today.pollenMax} />` : null}
-      ${today?.daylightH != null ? html`<${KV} label="Tageslänge" value=${`${num(today.daylightH, 1)} h`} k="daylight" infoValue=${today.daylightH} />` : null}
+      ${night?.nightTempMin != null ? html`<${KV} label=${warm ? 'Nacht, Tiefstwert (Tropennacht)' : 'Nacht, Tiefstwert'} value=${`${num(night.nightTempMin, 1)} °C`} k="nightTemp" infoValue=${night.nightTempMin} />` : null}
+      ${full || dreck ? (pm != null ? html`<${KV} label="Feinstaub PM2,5" value=${html`${num(pm, 1)} µg/m³ <span class=${`status ${dreck ? 'c-warn' : 'c-good'}`} style="padding:1px 8px;font-size:11px;margin-left:4px">${dreck ? 'über WHO' : 'unter WHO'}</span>`} k="pm25" infoValue=${pm} />` : null) : null}
+      ${full || pollen ? (today?.pollenMax != null ? html`<${KV} label="Pollen (Spitze)" value=${`${num(today.pollenMax)} /m³`} k="pollen" infoValue=${today.pollenMax} />` : null) : null}
+      ${full ? html`
+        ${night?.nightHumidity != null ? html`<${KV} label="Luftfeuchte nachts" value=${`${num(night.nightHumidity)} %`} k="humidity" infoValue=${night.nightHumidity} />` : null}
+        ${today?.tMax != null ? html`<${KV} label="Höchstwert heute" value=${`${num(today.tMax, 1)} °C`} k="dayTemp" infoValue=${today.tMax} />` : null}
+        ${today?.daylightH != null ? html`<${KV} label="Tageslänge" value=${`${num(today.daylightH, 1)} h`} k="daylight" infoValue=${today.daylightH} />` : null}` : null}
     </dl>
-    ${state.demo ? html`<p class="tiny muted" style="margin-top:10px">Erfundene Beispielwerte</p>` : state.repo.meta.lastContext ? html`<p class="tiny muted" style="margin-top:10px">Stand ${ago(state.repo.meta.lastContext)} · Open-Meteo, CAMS</p>` : null}
-  </section>`;
+    ${full ? (state.demo ? html`<p class="tiny muted" style="margin-top:10px">Erfundene Beispielwerte</p>` : state.repo.meta.lastContext ? html`<p class="tiny muted" style="margin-top:10px">Stand ${ago(state.repo.meta.lastContext)} · Open-Meteo, CAMS</p>` : null) : null}
+  <//>`;
+}
+
+/** Anteile der Recovery für die Karte „Was deine Werte bewegt“. */
+function contribList(d) {
+  const parts = d?.recoveryParts || {};
+  return [
+    ['hrv', 'HRV', d?.hrv != null ? `${num(d.hrv)} ms` : ''],
+    ['rhr', 'Ruhepuls', d?.rhr != null ? `${num(d.rhr)} bpm` : ''],
+    ['sleep', 'Schlaf', d?.sleepScore != null ? `Score ${num(d.sleepScore)}` : ''],
+    ['vital', 'Vitalwerte', ''],
+    ['subj', 'Gefühl', ''],
+  ].filter(([k]) => parts[k] != null).map(([k, label, detail]) => ({ label, value: parts[k], detail }));
+}
+
+const PAGE_TITEL = {
+  night: 'Letzte Nacht', sleep: 'Schlaf', load: 'Belastung', environment: 'Umwelt',
+  workouts: 'Letzte Trainings', contrib: 'Was deine Werte bewegt', hints: 'Hinweise des Tages',
+  periods: 'Tagesform im Schnitt',
+};
+
+/** Eine Karte als ganze Seite, erreichbar über den Knopf in der Ecke und über „#heute/schlaf“. */
+export function HomeCardPage({ id }) {
+  const [openWk, setOpenWk] = useState(null);
+  const [openNight, setOpenNight] = useState(null);
+  const date = state.date;
+  const d = state.results.days.get(date);
+  const prev = state.results.days.get(addDays(date, -1));
+  const contrib = contribList(d);
+  const leer = html`<section class="card"><p class="muted">Für diesen Tag gibt es dazu nichts.</p></section>`;
+  const inhalt = !d ? leer
+    : id === 'night' ? html`<${NightCard} d=${d} prev=${prev} onNight=${setOpenNight} full=${true} />`
+    : id === 'sleep' ? (d.sleep ? html`<${SleepCard} d=${d} onNight=${setOpenNight} full=${true} />` : leer)
+    : id === 'load' ? html`<${LoadCard} d=${d} date=${date} onOpen=${setOpenWk} full=${true} />`
+    : id === 'workouts' ? html`<${WorkoutsCard} onOpen=${setOpenWk} full=${true} Card=${Card} />`
+    : id === 'contrib' ? (html`<${ContribCard} d=${d} contrib=${contrib} full=${true} />` || leer)
+    : id === 'hints' ? (html`<${HintsCard} d=${d} full=${true} />` || leer)
+    : id === 'environment' ? html`<${Environment} date=${date} full=${true} />`
+    : id === 'periods' ? html`<${FormPeriods} full=${true} />`
+    : leer;
+  return html`
+    <${SubTopbar} title=${PAGE_TITEL[id] || 'Karte'} sub=${dayLabel(date, state.today)} back="heute" backLabel="Zurück zu Heute" />
+    <main class="view">
+      <${DemoBanner} />
+      ${inhalt}
+      ${openWk ? html`<${WorkoutSheet} item=${openWk} date=${openWk.date || date} onClose=${() => setOpenWk(null)} />` : null}
+      ${openNight ? html`<${NightSheet} date=${date} metric=${openNight} onClose=${() => setOpenNight(null)} />` : null}
+    </main>`;
 }
 
 export function TodayView() {
   const settings = state.repo.settings;
   const vis = (id) => cardOn(settings, id);
   const [openWk, setOpenWk] = useState(null);
+  const [openNight, setOpenNight] = useState(null);
   const date = state.date;
   const d = state.results.days.get(date);
   const prev = state.results.days.get(addDays(date, -1));
@@ -381,14 +577,7 @@ export function TodayView() {
   const formDelta = d?.form != null && prev?.form != null ? d.form - prev.form : null;
   const rz = zoneOf(d?.recovery, settings);
 
-  const parts = d?.recoveryParts || {};
-  const contrib = [
-    ['hrv', 'HRV', d?.hrv != null ? `${num(d.hrv)} ms` : ''],
-    ['rhr', 'Ruhepuls', d?.rhr != null ? `${num(d.rhr)} bpm` : ''],
-    ['sleep', 'Schlaf', d?.sleepScore != null ? `Score ${num(d.sleepScore)}` : ''],
-    ['vital', 'Vitalwerte', ''],
-    ['subj', 'Gefühl', ''],
-  ].filter(([k]) => parts[k] != null).map(([k, label, detail]) => ({ label, value: parts[k], detail }));
+  const contrib = contribList(d);
 
   const strainSub = d?.strain == null ? 'keine Pulsdaten' : d.strainPartial ? `bis ${clock(lastSample)}` : d.strengthLoad > 0 ? `inkl. Kraft +${num(d.strengthLoad)}` : `Last ${num(d.load)}`;
   const sleepSub = d?.sleep ? `${hours(d.sleep.asleepMin)} geschlafen` : 'keine Schlafdaten';
@@ -466,87 +655,21 @@ export function TodayView() {
         ${vis('periods') ? html`<${FormPeriods} />` : null}
         <${ProfileHint} />
         <${BackupHint} />
-        ${vis('contrib') && (contrib.length || d.lifestyle?.reasons?.length) ? html`<section class="card">
-          <div class="card-head"><h2>Was deine Werte bewegt</h2><span class="tiny muted">Punkte</span></div>
-          ${contrib.length ? html`<${Contributions} items=${contrib} />
-          <p class="tiny muted" style="margin-top:10px">Recovery gegenüber einem Tag, an dem alles genau deinem Normalwert entspricht (Recovery 50).</p>` : null}
-          ${d.formParts?.length ? html`<hr class="divider" />
-            <div class="card-head" style="margin-bottom:6px"><h3 style="font-size:15px;margin:0">Woraus die Tagesform entsteht</h3><span class="tnum small muted">${num(d.formRaw)}</span></div>
-            <dl class="kv">
-              ${d.formParts.filter((x) => x.value != null).map((x) => html`<dt key=${`t${x.id}`}>${x.label} <span class="muted">${num(x.weight * 100)} %</span></dt><dd key=${`v${x.id}`}>${num(x.value)}</dd>`)}
-            </dl>
-            ${d.formCap != null ? html`<p class="small warn-ink" style="margin-top:6px">Gedeckelt auf ${num(d.formCap)}: Bei einer Recovery von ${num(d.recovery)} sollen Fitness und Belastungsbalance den Tag nicht hochziehen.</p>` : null}` : null}
-          ${d.lifestyle?.reasons?.length ? html`<hr class="divider" />
-            <div class="card-head" style="margin-bottom:6px"><h3 style="font-size:15px;margin:0">Dazu aus dem Logbuch</h3>
-              <span class="tnum small" style=${`color:var(--${d.lifestyle.delta < 0 ? 'crit' : 'good'})`}>${d.lifestyle.delta > 0 ? '+' : d.lifestyle.delta < 0 ? '−' : ''}${num(Math.abs(d.lifestyle.delta))} auf die Tagesform</span></div>
-            <ul class="bullets small">${d.lifestyle.reasons.map((r) => html`<li key=${r.id}>${r.text} <span class="muted tnum">(${r.points > 0 ? '+' : '−'}${num(Math.abs(r.points))})</span></li>`)}</ul>
-            <p class="tiny muted" style="margin-top:6px">Alkohol, Koffein und Wasser stecken zum Teil schon in HRV, Puls und Schlaf. Deshalb zählt das Logbuch nur mit wenigen Punkten dazu, höchstens ${num(state.repo.settings.model.form.lifestyle.cap)} nach unten. Abschaltbar unter Profil → Einstellungen → Modell und Gewichte.</p>` : null}
-        </section>` : null}
-        ${vis('hints') && d.hints?.length ? html`<section class="card" aria-label="Hinweise">
-          ${d.hints.map((h) => html`<div class=${`hint ${{ critical: 'c-crit', warning: 'c-warn', info: 'c-info' }[h.level]}`}>
-            <${Icon} name=${h.level === 'info' ? 'info' : 'alert'} size=${20} />
-            <div><b>${h.title}</b><p>${h.text}</p></div>
-          </div>`)}
-        </section>` : null}
+        ${vis('contrib') ? html`<${ContribCard} d=${d} contrib=${contrib} />` : null}
+        ${vis('hints') ? html`<${HintsCard} d=${d} />` : null}
         ${showEvening ? html`<section class="card row between">
           <div class="grow"><h3>Abendcheck</h3><p class="small muted">Was heute war, in etwa 30 Sekunden.</p></div>
           <button class="btn primary small" onClick=${() => openCheck('evening', state.today)}>Starten</button>
         </section>` : null}
-        ${vis('night') ? html`<section class="card">
-          <div class="card-head"><h2>Letzte Nacht</h2>${d.sleep ? html`<span class="tiny muted tnum">${clock(d.sleep.onset)}–${clock(d.sleep.wake)}</span>` : null}</div>
-          <div class="vitals">
-            <${Vital} name="HRV" k="hrv" value=${d.hrv} unit="ms" range=${rangeOf(d.base?.lnHrv, 0.06, Math.exp)} z=${d.z?.hrv} />
-            <${Vital} name=${`Ruhepuls${d.rhrSource === 'Apple Health' ? ' (Apple Health)' : ''}`} k="rhr" value=${d.rhr} unit="bpm" range=${rangeOf(d.base?.rhr, 1.5)} z=${d.z?.rhr} />
-            <${Vital} name="Atemfrequenz" k="resp" value=${d.resp} unit="/min" digits=${1} range=${rangeOf(d.base?.resp, 0.4)} z=${d.z?.resp} />
-            <${Vital} name="Blutsauerstoff" k="spo2" value=${d.spo2} unit="%" digits=${1} range=${rangeOf(d.base?.spo2, 0.7)} z=${d.z?.spo2} />
-            <${Vital} name="Hauttemperatur" k="temp" value=${d.temp} unit="°C" digits=${1} range=${rangeOf(d.base?.temp, 0.15)} z=${d.z?.temp} />
-          </div>
-          ${d.hrv == null && d.rhr == null ? html`<p class="small muted">Keine Nachtwerte. Prüfe, ob Zepp HRV und Herzfrequenz an Apple Health schreibt. <${HideCard} id="night" /></p>` : null}
-          <${NightReason} d=${d} prev=${prev} />
-          <p class="tiny muted" style="margin-top:8px">Der graue Balken ist dein persönlicher Normalbereich. Das (i) zeigt die allgemeinen Richtwerte.</p>
-        </section>` : null}
-        ${vis('sleep') && d.sleep ? html`<section class="card">
-          <div class="card-head"><h2>Schlaf</h2><span class="tiny muted row" style="gap:2px">Bedarf ${hours(d.sleepNeedH * 60)}<${InfoButton} k="sleepNeed" value=${d.sleepNeedH} label="Schlafbedarf" /></span></div>
-          <dl class="kv">
-            <${KV} label="Geschlafen" value=${hours(d.sleep.asleepMin)} k="asleep" infoValue=${d.sleep.asleepMin} />
-            ${d.sleepDebtH > 0.1 ? html`<${KV} label="Fehlt zum Bedarf" value=${hours(d.sleepDebtH * 60)} />` : null}
-            <${KV} label="Effizienz" value=${`${num(d.sleep.efficiency * 100)} %`} k="efficiency" infoValue=${d.sleep.efficiency} />
-            ${d.sleep.hasStages ? html`<${KV} label="Tiefschlaf" value=${`${hours(d.sleep.deepMin)} · ${num(d.sleep.deepPct * 100)} %`} k="deep" infoValue=${d.sleep.deepMin} extra=${{ pct: d.sleep.deepPct }} />
-              <${KV} label="REM" value=${`${hours(d.sleep.remMin)} · ${num(d.sleep.remPct * 100)} %`} k="rem" infoValue=${d.sleep.remMin} extra=${{ pct: d.sleep.remPct }} />` : null}
-            ${d.sleep.latencyMin != null ? html`<${KV} label="Eingeschlafen nach" value=${`${num(d.sleep.latencyMin)} min`} k="latency" infoValue=${d.sleep.latencyMin} />` : null}
-            <${KV} label="Aufwachphasen" value=${d.sleep.wakeEpisodes} k="wake" infoValue=${d.sleep.wakeEpisodes} />
-            ${d.sleepParts?.regularity != null ? html`<${KV} label="Regelmäßigkeit (7 Tage)" value=${`${num(d.sleepParts.regularity)} / 100`} k="regularity" infoValue=${d.sleepParts.regularity} />` : null}
-            ${d.sleepParts?.calm != null ? html`<${KV} label="Nächtliche Ruhe" value=${`${num(d.sleepParts.calm)} / 100`} />` : null}
-          </dl>
-          <${NeedParts} d=${d} />
-          ${d.sleepParts?.calm != null && d.sleepScore >= 70 && d.sleepParts.calm <= 45 ? html`<p class="small ink2" style="margin-top:8px">
-            Lang und durchgehend geschlafen, aber unruhig: Puls und HRV lagen schlechter als sonst. Deshalb kann der Schlaf-Score hoch und die Recovery trotzdem niedrig sein.</p>` : null}
-        </section>` : null}
+        ${vis('night') ? html`<${NightCard} d=${d} prev=${prev} onNight=${setOpenNight} />` : null}
+        ${vis('sleep') && d.sleep ? html`<${SleepCard} d=${d} onNight=${setOpenNight} />` : null}
         ${vis('detect') ? html`<${DetectCard} date=${date} />` : null}
-        ${vis('load') ? html`<section class="card">
-          <div class="card-head"><h2>Belastung</h2></div>
-          <dl class="kv">
-            ${d.load != null ? html`<${KV} label=${d.strainPartial ? 'Last bisher' : 'Last'} value=${num(d.load)} k="load" infoValue=${d.load} />` : null}
-            ${d.strengthLoad > 0 ? html`<${KV} label="davon Kraft-Zuschlag" value=${`+${num(d.strengthLoad)}`} />` : null}
-            ${active7 != null ? html`<${KV} label="Aktivminuten (7 Tage)" value=${num(active7)} k="activeMin" infoValue=${active7} />` : null}
-            ${d.acwr != null ? html`<${KV} label="7 zu 28 Tage" value=${num(d.acwr, 2)} k="acwr" infoValue=${d.acwr} />` : null}
-            ${d.energy != null ? html`<${KV} label=${d.strainPartial ? 'Aktive Energie bisher' : 'Aktive Energie'} value=${`${num(d.energy)} kcal`} />` : null}
-            ${wkKcal > 0 ? html`<${KV} label="davon im Training" value=${`${num(wkKcal)} kcal`} />` : null}
-            ${d.steps != null ? html`<${KV} label="Schritte" value=${num(d.steps)} k="steps" infoValue=${d.steps} />` : null}
-            ${vo2 != null ? html`<${KV} label="VO₂max (Schätzung)" value=${html`${num(vo2, 1)}${vo2Date !== date ? html` <span class="tiny muted">· ${dayLabel(vo2Date, state.today)}</span>` : null}`} k="vo2" infoValue=${vo2} />` : null}
-            ${d.fitness != null ? html`<${KV} label="Langzeit-Fitness" value=${num(d.fitness)} k="fitness" infoValue=${d.fitness} />` : null}
-          </dl>
-          ${d.workouts?.length ? html`<hr class="divider" />${d.workouts.map((w, i) => html`<button type="button" class="wk-row small" key=${i} onClick=${() => setOpenWk(w)}>
-            <span><b>${sportLabel(w.sport || w.kind) || WORKOUT_LABEL[w.kind] || 'Training'}</b> <span class="muted">${clock(w.t)} · ${num(w.durMin)} min</span></span>
-            <span class="muted tnum row" style="gap:6px">${[w.kcal > 0 ? `${num(w.kcal)} kcal` : '', w.avgHr ? `Ø ${num(w.avgHr)} bpm` : ''].filter(Boolean).join(' · ')}
-              <${Icon} name="right" size=${15} /></span></button>`)}
-            <p class="tiny muted" style="margin-top:6px">Tippe auf eine Einheit für die Zusammenfassung.</p>` : null}
-          ${d.energy != null ? html`<p class="tiny muted" style="margin-top:8px">Aktive Energie ohne Grundumsatz, so wie Apple Health sie zählt.</p>` : null}
-          ${d.load == null && !d.workouts?.length ? html`<p class="small muted">Keine Pulsdaten für diesen Tag. <${HideCard} id="load" /></p>` : null}
-        </section>` : null}
+        ${vis('workouts') ? html`<${WorkoutsCard} onOpen=${setOpenWk} Card=${Card} />` : null}
+        ${vis('load') ? html`<${LoadCard} d=${d} date=${date} onOpen=${setOpenWk} />` : null}
         ${vis('environment') ? html`<${Environment} date=${date} />` : null}
       ` : null}
       ${hasAny && !d ? html`<section class="card"><p class="muted">Für diesen Tag gibt es keine Daten.</p></section>` : null}
-      ${openWk ? html`<${WorkoutSheet} item=${openWk} date=${date} onClose=${() => setOpenWk(null)} />` : null}
+      ${openWk ? html`<${WorkoutSheet} item=${openWk} date=${openWk.date || date} onClose=${() => setOpenWk(null)} />` : null}
+      ${openNight ? html`<${NightSheet} date=${date} metric=${openNight} onClose=${() => setOpenNight(null)} />` : null}
     </main>`;
 }

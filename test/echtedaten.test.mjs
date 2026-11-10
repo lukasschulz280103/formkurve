@@ -102,6 +102,34 @@ test('Echte Daten: Erkennung findet die eine offene Einheit', () => {
   }
 });
 
+test('Echte Daten: die Schlafphasen ergeben einen lückenlosen Verlauf', async () => {
+  const { nightSegments } = await import('../js/ui/nightView.js');
+  const d = tag('2025-11-07');
+  const segs = nightSegments(index, d.sleep);
+  assert.ok(segs.length > 20, `${segs.length} Abschnitte`);
+  // Nichts überlappt, nichts läuft rückwärts, alles liegt in der Nacht
+  for (let i = 0; i < segs.length; i++) {
+    assert.ok(segs[i].e > segs[i].t, 'Abschnitt ohne Dauer');
+    assert.ok(segs[i].t >= d.sleep.start && segs[i].e <= d.sleep.end, 'Abschnitt außerhalb der Nacht');
+    if (i) assert.ok(segs[i].t >= segs[i - 1].e, `Überlappung bei ${i}`);
+  }
+  // Alle vier Phasen kommen vor, „Im Bett“ nicht
+  const codes = new Set(segs.map((s) => s.v));
+  for (const c of [2, 3, 4, 5]) assert.ok(codes.has(c), `Phase ${c} fehlt`);
+  assert.ok(!codes.has(0), '„Im Bett“ gehört nicht in den Verlauf');
+  // Die Summe der Abschnitte passt zur Zeit im Bett
+  const summe = segs.reduce((a, s) => a + (s.e - s.t), 0) / 60000;
+  assert.ok(Math.abs(summe - d.sleep.inBedMin) < d.sleep.inBedMin * 0.25, `${summe} gegen ${d.sleep.inBedMin}`);
+});
+
+test('Echte Daten: die Nacht hat genug Messwerte für einen Verlauf', () => {
+  const d = tag(TODAY);
+  const zahl = (t) => index.window(t, d.sleep.start, d.sleep.end).t.length;
+  assert.ok(zahl('hr') > 100, `Puls: ${zahl('hr')}`);
+  assert.ok(zahl('spo2') > 20, `SpO2: ${zahl('spo2')}`);
+  assert.ok(zahl('resp') > 20, `Atmung: ${zahl('resp')}`);
+});
+
 test('Echte Daten: keine Fehlalarme bei zehn Nächten Verlauf', () => {
   // Der Ruhepuls liegt 3 Standardabweichungen daneben, aber die Baseline ist zu jung
   assert.deepEqual(earlyWarnings({ days: res.days, today: TODAY, settings }), []);

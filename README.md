@@ -2,7 +2,7 @@
 
 Persönliche Tagesform, Recovery, Schlaf und Strain aus den Daten deines Amazfit Helio Strap, dazu ein kurzer Morgen- und Abendcheck, ein Logbuch für Wasser, Koffein, Glück, Sport, Arbeitszeit und Tagebuch und eine Analyse, welche Gewohnheiten und Umweltfaktoren deine Werte bewegen. Eine Web-App: Jedes Konto besteht aus Name und PIN und liegt verschlüsselt auf dem Gerät. Wer will, verbindet es mit einem Online-Konto (E-Mail und Passwort) und nutzt es auf mehreren Geräten gleichzeitig; die Daten werden vorher auf dem Gerät verschlüsselt. Freunde nutzen denselben Link und legen ihr eigenes Konto an.
 
-Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.10.1.
+Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.12.0.
 
 ## Auf GitHub Pages bringen (kostenlos)
 
@@ -11,7 +11,7 @@ GitHub Pages braucht die Datei `index.html` ganz oben im Repository. Liegt sie e
 ### Erstes Hochladen (Windows)
 
 1. Auf github.com ein kostenloses Konto anlegen und ein neues Repository erstellen, Name zum Beispiel `formkurve`, Sichtbarkeit **Public** (GitHub Pages ist nur für öffentliche Repositories kostenlos; der Code enthält keine persönlichen Daten).
-2. `formkurve-0.10.1.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
+2. `formkurve-0.12.0.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
 3. Im Repository auf **Add file → Upload files** klicken.
 4. Im geöffneten Ordner **alles markieren** (Strg + A) und in das Upload-Feld ziehen. Nicht den Ordner selbst ziehen und nicht die ZIP-Datei.
 5. Warten, bis alle Dateien aufgelistet sind, dann unten **Commit changes**.
@@ -148,6 +148,23 @@ Semantische Farben bleiben in beiden Varianten gleich: Grün heißt gut, Gelb Vo
 **Profil → Einstellungen → Karten auf „Heute“:** acht Karten lassen sich einzeln abschalten – Ringe, Tagesform im Schnitt, Was deine Recovery bewegt, Hinweise, Letzte Nacht, Schlaf, Belastung und Umwelt. Die Tagesform selbst und die Karten für Import, Check-in und Frühwarnungen bleiben immer.
 
 Karten, für die gar keine Messwerte ankommen, erkennt die App aus der Datenprüfung und bietet sie oben in der Liste zum Ausblenden an („Diese ausblenden“ schaltet alle auf einmal ab). Steht eine solche Karte leer auf „Heute“, steht neben dem Hinweis direkt ein **Karte ausblenden**. Kommt der Wert später doch, schaltest du sie in den Einstellungen wieder ein.
+
+## Kurze Karten, ganze Seiten
+
+Auf „Heute“ steht in jeder Karte nur das Nötigste: der Wert, der zählt, und Warnungen. Oben rechts in der Ecke öffnet ein Knopf dieselbe Karte als **ganze Seite** mit allen Einzelheiten – oder direkt über die Adresse, etwa `#heute/sleep`.
+
+| Karte | Kurz | Auf der Seite |
+| --- | --- | --- |
+| Letzte Nacht | HRV und Ruhepuls, Auffälliges in einem Satz | alle fünf Werte, ausführliche Erklärung |
+| Schlaf | geschlafen, was zum Bedarf fehlt | Effizienz, Tiefschlaf, REM, Latenz, Regelmäßigkeit, nächtliche Ruhe, Rechnung des Bedarfs |
+| Belastung | Last und Schritte | Kraft-Zuschlag, Aktivminuten, 7 zu 28 Tage, Energie, Fitness, Trainings des Tages |
+| Letzte Trainings | die letzten vier | bis zu 40, mit Erklärung |
+| Was deine Werte bewegt | die drei stärksten Anteile, Deckel-Warnung, Logbuch-Summe | alle Anteile, Rechnung der Tagesform, alle Gründe |
+| Hinweise | nur Warnungen, höchstens zwei | alle Hinweise mit Text |
+| Umwelt | Nachttemperatur, Feinstaub und Pollen nur bei Auffälligkeit | Luftfeuchte, Höchstwert, Tageslänge |
+| Tagesform im Schnitt | Durchschnitt und Unterschied zur Vorwoche | Diagramm, Tabelle, Wochen oder Monate |
+
+Der Zurück-Pfeil führt auf „Heute“; welche Karten überhaupt erscheinen, bleibt unter **Profil → Einstellungen → Karten auf „Heute“** einstellbar.
 
 ## Der Monatskalender
 
@@ -399,6 +416,33 @@ Dieselbe Liste benutzt die Infektwarnung: Gibt es eine Erklärung und kein Krank
 4. Abends: Glück, Arbeitszeit und ein paar Zeilen Tagebuch im Logbuch, dann der Abendcheck, etwa 30 Sekunden; was im Logbuch steht, fragt er nicht mehr. Erinnern kann eine Kurzbefehl-Automation „Tageszeit 21:00 → Mitteilung anzeigen“.
 5. Nach etwa 6 Wochen werden die Einsichten belastbar.
 
+## Die Nacht im Detail
+
+Ein Tipp auf den Balken eines Werts unter **Letzte Nacht** – oder auf **Phasen ansehen** in der Schlafkarte – öffnet den Verlauf. Oben vier Zeiträume (**Nacht, Woche, Monat, 6 M**), darunter die Auswahl zwischen Schlaf, HRV, Puls, Atmung und Sauerstoff.
+
+- **Nacht, Schlaf:** die Phasen als Spuren wie in der Health-App, Wach oben bis Tief unten, mit den Farben Rot, Türkis, Blau und Indigo. Darunter Dauer und Anteil je Phase.
+- **Nacht, Messwert:** der Verlauf aus den Einzelmessungen, mit deinem Schnitt als gestrichelter Linie und dem üblichen Bereich grau hinterlegt.
+- **Woche bis 6 Monate:** je Nacht eine Säule – beim Schlaf nach Phasen gestapelt, sonst ein Punkt je Nacht mit der Mittellinie. Ein Tipp auf eine Säule springt in diese Nacht.
+
+Wie viele Messwerte dabei zusammenkommen, hängt vom Band ab: Puls, Atmung und Sauerstoff liefern pro Nacht Dutzende bis Hunderte Werte, HRV oft nur zwei bis fünf.
+
+## Trainings
+
+Die Karte **Letzte Trainings** auf „Heute“ zeigt die letzten zwölf Einheiten – gemessene und selbst eingetragene zusammen, damit ein bestätigter Sport nicht aus dem Blick gerät. Je Zeile Art, Tag, Uhrzeit, Dauer und, wo vorhanden, **Strecke und Tempo** (min/km, beim Radfahren km/h), Ø-Puls und Energie. Oben rechts die Summe der letzten sieben Tage. Ein Tipp öffnet die Zusammenfassung mit Pulszonen.
+
+**Kilometer** liest die App aus dem Apple-Health-Export (`totalDistance` und die Statistiken je Einheit) und aus Strava. Der Helio Strap selbst liefert über Zepp keine Strecke – dort bleibt die Angabe leer.
+
+### Strava
+
+Eine direkte Verbindung zu Strava ist für diese App nicht möglich: Strava verlangt dafür einen Server mit geheimem Schlüssel, und Formkurve ist eine reine Seite auf GitHub Pages. Zwei Wege gibt es trotzdem:
+
+| Weg | So geht es |
+| --- | --- |
+| **Über Apple Health** (einfacher) | In der Strava-App „Gesundheit“ einschalten. Strava schreibt die Trainings dann nach Health, und sie kommen mit dem normalen Export oder Kurzbefehl mit. |
+| **Export-Datei** | Strava → Einstellungen → Mein Konto → „Eine Kopie deiner Daten herunterladen“. Im ZIP liegt `activities.csv`; entpacken und unter **Daten importieren → Datei wählen** auswählen. Daraus werden Trainings mit Art, Dauer, Strecke, Puls und Energie – auch rückwirkend über Jahre. |
+
+Die Art wird übersetzt (Run → Laufen, Ride → Radfahren, WeightTraining → Kraft und so weiter), Unbekanntes landet bei „Anderes“.
+
 ## Prüfung an echten Daten
 
 Im Ordner `test/fixtures/echte-naechte.json` liegen zehn echte Nächte mit dem Helio Strap, anonymisiert: Datum um 364 Tage zurückgeschoben (Wochentage bleiben gleich), kein Tagebuchtext, Puls der neun älteren Tage auf ein 10-Minuten-Raster ausgedünnt. `test/echtedaten.test.mjs` hält damit fest, was an diesen Tagen herauskommen muss — unter anderem, dass die Nacht nach sieben Getränken eine Tagesform unter 25 ergibt und nicht wie früher um die 40.
@@ -431,6 +475,8 @@ Diese Testdaten haben zwei Fehler aufgedeckt, die mit erfundenen Daten unsichtba
 | `js/model/earlywarning.js` | Frühwarnungen: Auslöser, Störfaktoren, Pausen |
 | `js/model/sports.js` | Katalog der Sportarten mit Startwerten für die Erkennung |
 | `js/model/detect.js` | Abschnitte mit erhöhtem Puls finden, Art schätzen, aus Einträgen lernen |
+| `js/ui/nightView.js` | Nacht im Detail: Schlafphasen, Verlauf je Messwert, Woche bis 6 Monate |
+| `js/import/strava.js` | activities.csv aus dem Strava-Export lesen |
 | `js/ui/workouts.js` | Karte „War das Sport?“, Sportauswahl und die Zusammenfassung einer Einheit |
 | `js/model/lifestyle.js` | Logbuch-Zuschlag auf die Tagesform und die Erklärungen für auffällige Nachtwerte |
 | `js/ui/cards.js` | Karten auf „Heute“: Katalog, Sichtbarkeit, Vorschlag zum Ausblenden |

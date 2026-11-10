@@ -22,3 +22,14 @@ test('Navigation: Links auf die Reiter bis 0.5 landen an der neuen Stelle', () =
   // Der Check-in ist jetzt ein Blatt über jedem Reiter
   assert.deepEqual(parseRoute('#check'), { route: 'heute', sub: null });
 });
+
+test('Karten lassen sich als eigene Seite ansteuern', async () => {
+  const { parseRoute, HOME_PAGES } = await import('../js/ui/state.js');
+  for (const id of HOME_PAGES) assert.deepEqual(parseRoute(`#heute/${id}`), { route: 'heute', sub: id });
+  // Unbekanntes landet wieder auf der Übersicht
+  assert.deepEqual(parseRoute('#heute/quatsch'), { route: 'heute', sub: null });
+  assert.deepEqual(parseRoute('#heute'), { route: 'heute', sub: null });
+  // Die alten Adressen gelten weiter
+  assert.deepEqual(parseRoute('#profil/konto'), { route: 'profil', sub: 'konto' });
+  assert.deepEqual(parseRoute('#einsichten'), { route: 'profil', sub: 'einsichten' });
+});

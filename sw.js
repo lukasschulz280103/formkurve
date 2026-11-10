@@ -1,6 +1,6 @@
 // Service Worker: zuerst Netz (immer aktuelle Dateien), bei fehlendem Netz der Zwischenspeicher.
 // Die Daten (IndexedDB) fasst der Service Worker nie an; ein Update ersetzt nur die App-Dateien.
-const VERSION = '0.10.1';
+const VERSION = '0.12.0';
 const CACHE = `formkurve-${VERSION}`;
 const CORE = ['./', './index.html', './manifest.webmanifest', './css/app.css', './js/main.js', './icons/icon-180.png', './icons/icon.svg'];
 

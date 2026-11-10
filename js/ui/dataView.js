@@ -252,9 +252,10 @@ function PasteImport() {
       }}></textarea>
     <div class="row wrap">
       <button class="btn small" disabled=${!text.trim()} onClick=${() => run(text)}>Text importieren</button>
-      <button class="btn small ghost" onClick=${() => fileRef.current?.click()}><${Icon} name="file" size=${16} />Textdatei wählen</button>
+      <button class="btn small ghost" onClick=${() => fileRef.current?.click()}><${Icon} name="file" size=${16} />Datei wählen</button>
       <input ref=${fileRef} type="file" accept=".txt,.json,.csv,text/plain,application/json" hidden onChange=${fromFile} />
     </div>
+    <p class="tiny muted">Hier passt auch die <b>activities.csv</b> aus dem Strava-Export: Strava → Einstellungen → Mein Konto → „Eine Kopie deiner Daten herunterladen“. Das ZIP entpacken und die Datei wählen; daraus werden Trainings samt Strecke, Puls und Energie. Einfacher geht es, wenn du in der Strava-App „Gesundheit“ einschaltest – dann kommen die Trainings über Apple Health von selbst mit.</p>
     ${err ? html`<p class="small" style="color:var(--crit)">${err}</p>` : null}
   </div>`;
 }

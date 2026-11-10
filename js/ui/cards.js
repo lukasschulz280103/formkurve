@@ -11,6 +11,7 @@ export const HOME_CARDS = [
   { id: 'night', label: 'Letzte Nacht', needs: ['hrv', 'hr', 'rhr', 'resp', 'spo2', 'wtemp'], hint: 'HRV, Ruhepuls, Atemfrequenz, Blutsauerstoff, Hauttemperatur.' },
   { id: 'sleep', label: 'Schlaf', needs: ['sleep'], hint: 'Dauer, Effizienz, Tiefschlaf und REM.' },
   { id: 'detect', label: 'War das Sport?', needs: ['hr'], hint: 'Fragt nach, wenn der Puls lange erhöht war, ohne dass ein Training eingetragen ist.' },
+  { id: 'workouts', label: 'Letzte Trainings', needs: [], hint: 'Die letzten Einheiten mit Dauer, Strecke, Puls und Energie.' },
   { id: 'load', label: 'Belastung', needs: ['hr', 'steps', 'energy'], hint: 'Last, Aktivminuten, Schritte, Energie, Trainings.' },
   { id: 'environment', label: 'Umwelt', needs: [], hint: 'Wetter, Luft und Pollen am Ort.' },
 ];
