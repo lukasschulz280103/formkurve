@@ -2,7 +2,7 @@
 
 Persönliche Tagesform, Recovery, Schlaf und Strain aus den Daten deines Amazfit Helio Strap, dazu ein kurzer Morgen- und Abendcheck, ein Logbuch für Wasser, Koffein, Glück, Sport, Arbeitszeit und Tagebuch und eine Analyse, welche Gewohnheiten und Umweltfaktoren deine Werte bewegen. Eine Web-App: Jedes Konto besteht aus Name und PIN und liegt verschlüsselt auf dem Gerät. Wer will, verbindet es mit einem Online-Konto (E-Mail und Passwort) und nutzt es auf mehreren Geräten gleichzeitig; die Daten werden vorher auf dem Gerät verschlüsselt. Freunde nutzen denselben Link und legen ihr eigenes Konto an.
 
-Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.12.0.
+Grundlage ist das Konzeptdokument „Helio Strap: Score- und Umfragekonzept“. Version 0.13.1.
 
 ## Auf GitHub Pages bringen (kostenlos)
 
@@ -11,7 +11,7 @@ GitHub Pages braucht die Datei `index.html` ganz oben im Repository. Liegt sie e
 ### Erstes Hochladen (Windows)
 
 1. Auf github.com ein kostenloses Konto anlegen und ein neues Repository erstellen, Name zum Beispiel `formkurve`, Sichtbarkeit **Public** (GitHub Pages ist nur für öffentliche Repositories kostenlos; der Code enthält keine persönlichen Daten).
-2. `formkurve-0.12.0.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
+2. `formkurve-0.13.1.zip` herunterladen, Rechtsklick → **Alle extrahieren** → **Extrahieren**. Es öffnet sich ein Ordner mit `index.html`, `sw.js` und den Ordnern `css`, `js`, `icons`.
 3. Im Repository auf **Add file → Upload files** klicken.
 4. Im geöffneten Ordner **alles markieren** (Strg + A) und in das Upload-Feld ziehen. Nicht den Ordner selbst ziehen und nicht die ZIP-Datei.
 5. Warten, bis alle Dateien aufgelistet sind, dann unten **Commit changes**.
@@ -151,17 +151,17 @@ Karten, für die gar keine Messwerte ankommen, erkennt die App aus der Datenprü
 
 ## Kurze Karten, ganze Seiten
 
-Auf „Heute“ steht in jeder Karte nur das Nötigste: der Wert, der zählt, und Warnungen. Oben rechts in der Ecke öffnet ein Knopf dieselbe Karte als **ganze Seite** mit allen Einzelheiten – oder direkt über die Adresse, etwa `#heute/sleep`.
+Auf „Heute“ steht in jeder Karte nur das Nötigste: der Wert, der zählt, und Warnungen. Oben rechts in der Ecke sitzt ein Knopf für die Einzelheiten. Was kurz bleibt – aufgeklappt gut unter einem Drittel des Bildschirms –, **klappt an derselben Stelle auf und zu**: „Hinweise“ und „Umwelt“. Alles Längere öffnet weiter eine **ganze Seite**, auch direkt über die Adresse, etwa `#heute/sleep`.
 
 | Karte | Kurz | Auf der Seite |
 | --- | --- | --- |
 | Letzte Nacht | HRV und Ruhepuls, Auffälliges in einem Satz | alle fünf Werte, ausführliche Erklärung |
 | Schlaf | geschlafen, was zum Bedarf fehlt | Effizienz, Tiefschlaf, REM, Latenz, Regelmäßigkeit, nächtliche Ruhe, Rechnung des Bedarfs |
 | Belastung | Last und Schritte | Kraft-Zuschlag, Aktivminuten, 7 zu 28 Tage, Energie, Fitness, Trainings des Tages |
-| Letzte Trainings | die letzten vier | bis zu 40, mit Erklärung |
+| Letzte Trainings | die letzten vier | Feed mit bis zu 40 Einheiten, bearbeiten, zusammenlegen |
 | Was deine Werte bewegt | die drei stärksten Anteile, Deckel-Warnung, Logbuch-Summe | alle Anteile, Rechnung der Tagesform, alle Gründe |
-| Hinweise | nur Warnungen, höchstens zwei | alle Hinweise mit Text |
-| Umwelt | Nachttemperatur, Feinstaub und Pollen nur bei Auffälligkeit | Luftfeuchte, Höchstwert, Tageslänge |
+| Hinweise | nur Warnungen, höchstens zwei | aufklappen: alle Hinweise mit Text |
+| Umwelt | Nachttemperatur, Feinstaub und Pollen nur bei Auffälligkeit | aufklappen: Luftfeuchte, Höchstwert, Tageslänge |
 | Tagesform im Schnitt | Durchschnitt und Unterschied zur Vorwoche | Diagramm, Tabelle, Wochen oder Monate |
 
 Der Zurück-Pfeil führt auf „Heute“; welche Karten überhaupt erscheinen, bleibt unter **Profil → Einstellungen → Karten auf „Heute“** einstellbar.
@@ -238,6 +238,21 @@ Jeder Wert im Dashboard hat ein (i) mit dem allgemeinen Normal- oder Richtwert, 
 | Kurzbefehl „Formkurve Sync“ | täglich | Kurzbefehl ausführen → Formkurve öffnen → auf **Heute** im Hinweis **Einfügen und importieren** (sonst **Profil → Daten importieren**) |
 
 Auf **Heute** zeigt die Karte „Belastung“ die **aktive Energie** des Tages in kcal (ohne Grundumsatz, wie Apple Health) und bei jedem Training die verbrannten kcal. Dafür muss Zepp „Aktive Energie“ an Apple Health schreiben.
+
+### Wie die Zahlen zu Apple Health passen
+
+Dieselben Messungen, andere Zusammenfassung. Apple Health zeigt je Nacht die **Spanne** aller Einzelmessungen mit Höchstwert, Formkurve braucht **eine Zahl je Nacht**, weil Baseline, Scores und Warnungen darauf rechnen. Deshalb stehen in der ganzen Ansicht von „Letzte Nacht“ jetzt beide: die Zahl und darunter die Spanne mit der Anzahl der Messungen.
+
+| Wert | Formkurve | Apple Health zeigt | Beispiel aus echten Daten |
+| --- | --- | --- | --- |
+| HRV | geometrisches Mittel der Nachtmessungen (robust gegen einen Ausreißer nach oben) | Minimum bis Maximum der Einzelwerte | 56 ms, Spanne 22–92 ms aus 4 Messungen |
+| Ruhepuls | 10. Perzentil des Pulses im Schlaf – der ruhigste Teil der Nacht, nicht das Minimum | den Wert, den das Band selbst als Ruhepuls meldet | 43 bpm, das Band meldet 43; Nachtpuls insgesamt 42–113 bpm |
+| Atemfrequenz | Mittel über die Nacht | Spanne der Einzelmessungen | 13,3 /min, Spanne 11–18 /min aus 534 Messungen |
+| Blutsauerstoff | Mittel; für die Frühwarnung zusätzlich Median und Minimum | Spanne | 97 %, Spanne 95–99 % |
+
+Weicht der Ruhepuls des Bandes von unserem ab, steht das darunter („dein Gerät meldet 47 bpm an Apple Health“). Die Einheiten sind geprüft: HRV in ms (SDNN), Puls in bpm, Atmung in Atemzügen je Minute, SpO₂ in Prozent, Gewicht in kg, Temperatur in °C. Werte in °F, lb, kJ oder Sauerstoff als Anteil (0,97) werden beim Import umgerechnet.
+
+**Korrigiert in 0.13.1:** Die aktive Energie aus dem Apple-Health-Export war tausendfach zu hoch. Apple schreibt kcal mit drei Dezimalstellen (`value="8.854"` für 8,854 kcal); der Punkt wurde als Tausendertrennung gelesen. Aus echten 165 kcal am Tag wurden so über 60 000. Beim ersten Start von 0.13.1 repariert die App die schon gespeicherten Werte selbst – erkannt an mehr als 20 kcal je Minute bei einer glatten Zahl –; ein neuer Import ist nicht nötig. Schritte bleiben unberührt, dort ist „1.234“ wirklich eine Tausendertrennung.
 
 Die Anleitung für den Kurzbefehl steht in [KURZBEFEHL.md](KURZBEFEHL.md) und in der App unter **Profil → Daten importieren**. Importe landen immer im gerade angemeldeten Konto. Vorher in der Health-App unter Profilbild → Apps → Zepp alle Kategorien freigeben.
 
@@ -428,7 +443,20 @@ Wie viele Messwerte dabei zusammenkommen, hängt vom Band ab: Puls, Atmung und S
 
 ## Trainings
 
-Die Karte **Letzte Trainings** auf „Heute“ zeigt die letzten zwölf Einheiten – gemessene und selbst eingetragene zusammen, damit ein bestätigter Sport nicht aus dem Blick gerät. Je Zeile Art, Tag, Uhrzeit, Dauer und, wo vorhanden, **Strecke und Tempo** (min/km, beim Radfahren km/h), Ø-Puls und Energie. Oben rechts die Summe der letzten sieben Tage. Ein Tipp öffnet die Zusammenfassung mit Pulszonen.
+Die Karte **Letzte Trainings** auf „Heute“ zeigt die letzten zwölf Einheiten – gemessene und selbst eingetragene zusammen, damit ein bestätigter Sport nicht aus dem Blick gerät. Je Zeile Art, Tag, Uhrzeit, Dauer und, wo vorhanden, **Strecke und Tempo** (min/km, beim Radfahren km/h), Ø-Puls und Energie. Oben rechts die Summe der letzten sieben Tage. Ein Tipp öffnet die Zusammenfassung mit Pulszonen; dort steht zu jeder Zone 1–5, was sie ist, wie sie sich anfühlt und in welchem Pulsbereich sie bei dir liegt (Karvonen, aus Ruhepuls und Maximalpuls).
+
+### Bearbeiten, löschen, zusammenlegen
+
+Die ganze Ansicht der Karte – über den Knopf in der Ecke oder unten im Reiter **Verlauf** – zeigt die Einheiten als **Feed**: Art, Zeit, Zahlen, dazu Ort, Notiz und Bilder.
+
+| Was | Wie |
+| --- | --- |
+| **Bearbeiten** | „Bearbeiten“ an der Einheit: Sportart, Beginn, Dauer, Strecke, Ort, Notiz, bis zu vier Bilder. |
+| **Löschen** | Im Bearbeiten-Blatt. Gemessene Einheiten werden nur **ausgeblendet** – die Messung bleibt, „Auf Messung zurücksetzen“ holt sie zurück. |
+| **Als Stress markieren** | Schalter im Blatt oder „Auswählen → Als Stress“. Die Einheit bleibt mit Puls und Dauer sichtbar, ihr Anteil wird aber aus Last und Strain **herausgerechnet** (`d.stressTrimp` hält fest, wie viel). |
+| **Zusammenlegen** | „Auswählen“, zwei oder mehr Einheiten **eines Tages** ankreuzen, „Zusammenlegen“. Die Dauer reicht vom frühesten Beginn bis zum spätesten Ende, Strecken werden addiert. |
+
+Änderungen fassen die Messdaten nie an. Sie liegen als kleines Feld im Logbuch-Tag (`wk:<Quelle>|<Startzeit>`, siehe `js/journal/sessions.js`) und gleichen sich darum wie jedes andere Logbuch-Feld zwischen Geräten ab – zuletzt gespeichert gewinnt. **Bilder bleiben auf dem Gerät**: sie liegen im Bereich `media` der lokalen Datenbank, werden beim Hinzufügen auf 1280 px verkleinert und nicht synchronisiert und nicht gesichert.
 
 **Kilometer** liest die App aus dem Apple-Health-Export (`totalDistance` und die Statistiken je Einheit) und aus Strava. Der Helio Strap selbst liefert über Zepp keine Strecke – dort bleibt die Angabe leer.
 
@@ -458,6 +486,7 @@ Diese Testdaten haben zwei Fehler aufgedeckt, die mit erfundenen Daten unsichtba
 | --- | --- |
 | `js/version.js` | Versionsnummer (muss zu `sw.js` passen; ein Test prüft das) |
 | `js/journal/journal.js` | Logbuch: Einträge, Tageswerte, Zusammenführen zweier Geräte, Antworten für Abendcheck und Einsichten |
+| `js/journal/sessions.js` | Trainings bearbeiten: Änderungen als Logbuch-Feld, eigene und gemessene Einheiten eines Tages, Zusammenlegen |
 | `js/ui/journalView.js` | Logbuch-Ansicht, Rückblick und Karte auf „Heute“ |
 | `js/ui/app.js`, `js/ui/state.js` | Reiter, Adressen wie `#profil/konto`, Weiterleitung alter Adressen |
 | `js/ui/profileView.js`, `js/ui/dataView.js` | Reiter „Profil“: Übersicht und Unterseiten (Konto, Import, Körperdaten, Umwelt, Einstellungen, Backup) |
@@ -477,7 +506,8 @@ Diese Testdaten haben zwei Fehler aufgedeckt, die mit erfundenen Daten unsichtba
 | `js/model/detect.js` | Abschnitte mit erhöhtem Puls finden, Art schätzen, aus Einträgen lernen |
 | `js/ui/nightView.js` | Nacht im Detail: Schlafphasen, Verlauf je Messwert, Woche bis 6 Monate |
 | `js/import/strava.js` | activities.csv aus dem Strava-Export lesen |
-| `js/ui/workouts.js` | Karte „War das Sport?“, Sportauswahl und die Zusammenfassung einer Einheit |
+| `js/ui/workouts.js` | Karte „War das Sport?“, Sportauswahl, Trainings-Feed und die Zusammenfassung einer Einheit mit Pulszonen |
+| `js/ui/sessionEdit.js` | Blatt zum Bearbeiten: Sportart, Zeit, Dauer, Strecke, Ort, Notiz, Bilder, Stress-Schalter |
 | `js/model/lifestyle.js` | Logbuch-Zuschlag auf die Tagesform und die Erklärungen für auffällige Nachtwerte |
 | `js/ui/cards.js` | Karten auf „Heute“: Katalog, Sichtbarkeit, Vorschlag zum Ausblenden |
 | `js/model/coverage.js` | Datenprüfung: Zustand je Messwert, welche Berechnung woran hängt, Text der Meldung |
