@@ -626,7 +626,9 @@ input[type="time"].field { width: auto; min-width: 130px; font-family: var(--fon
 .conf { display: inline-flex; gap: 3px; align-items: center; }
 .conf i { width: 6px; height: 6px; border-radius: 2px; background: var(--surface-3); display: inline-block; }
 .conf i.on { background: var(--ink-2); }
-.filterrow { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+/* min-height: ein scrollbarer Kasten darf in einem Grid auf 0 schrumpfen – ohne diese
+   Zeile verschwindet die Leiste, sobald das Blatt voll ist. */
+.filterrow { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; min-height: 42px; flex: none; }
 .dose { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; align-items: end; height: 96px; margin-top: 6px; }
 .dose .col { display: grid; gap: 4px; justify-items: center; font-size: 12px; color: var(--muted); }
 .dose .bar { width: min(24px, 100%); border-radius: 4px 4px 0 0; background: var(--ink-2); }
@@ -1250,3 +1252,27 @@ button.card { -webkit-appearance: none; appearance: none; width: 100%; font: inh
 .live-num { font-size: 26px; font-weight: 650; line-height: 1.1; }
 .live-unit { font-size: 11px; color: var(--muted); }
 .live-label { font-size: 12px; margin-top: 2px; }
+
+/* Tagesverlauf: Kurve über 24 Stunden, Stressband je Stunde */
+.daychart { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "y chart" ". ticks"; gap: 2px 6px; }
+.daychart .axis-y { grid-area: y; display: flex; flex-direction: column; justify-content: space-between; font-size: 10px; color: var(--muted); }
+.daychart svg { grid-area: chart; width: 100%; height: 100%; }
+.daychart .ticks { grid-area: ticks; display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); }
+.daychart:has(.axis-y) svg { min-height: 90px; }
+.stressband { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; margin: 2px 0 4px; }
+.stressband .sb { height: 18px; border-radius: 3px; background: var(--surface-3); }
+.stressband .sb.ruhig { background: color-mix(in srgb, var(--good) 45%, transparent); }
+.stressband .sb.leicht { background: color-mix(in srgb, var(--good) 20%, var(--warn) 35%); }
+.stressband .sb.erhoeht { background: color-mix(in srgb, var(--warn) 70%, transparent); }
+.stressband .sb.hoch { background: var(--crit); }
+.stressband .sb.leer { background: var(--surface-3); opacity: 0.6; }
+.sheet.day { max-height: 92vh; }
+
+/* Der HRV-Verlauf in der Nacht-Karte: aufklappbar, damit die Karte kurz bleibt. */
+.hrvdet { margin-top: 10px; }
+.hrvdet > summary { cursor: pointer; list-style: none; padding: 6px 0; color: var(--ink-2); font-weight: 600; }
+.hrvdet > summary::-webkit-details-marker { display: none; }
+.hrvdet > summary::before { content: "▸ "; color: var(--muted); }
+.hrvdet[open] > summary::before { content: "▾ "; }
+.hrvdet .daychart { margin-top: 6px; }
+.hrvdet .ticks { font-variant-numeric: tabular-nums; }
