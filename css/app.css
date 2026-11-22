@@ -774,7 +774,15 @@ details.more[open] > summary .icon { transform: rotate(180deg); }
   font-size: 16px;
   text-align: left;
 }
-.field-label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.field-label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; color: var(--ink-2); justify-items: start; }
+/* Ein <label> umschließt Text und Feld. Safari auf dem iPhone malt beim Antippen die
+   ganze Label-Fläche ein – bei schmaler Textzeile über breitem Feld ergibt das einen
+   hohen, schief wirkenden Farbstreifen über dem Feld. Die Hervorhebung des Feldes
+   selbst reicht völlig. */
+label, button, .chip, .btn, summary, [role="button"] { -webkit-tap-highlight-color: transparent; }
+/* Sicherheitsnetz für Labels, die ein Feld direkt enthalten, aber keine Klasse tragen. */
+label:has(> .field), label:has(> .stepper) { display: grid; gap: 6px; justify-items: start; }
+label > .field { width: 100%; }
 .field.pin { font-family: var(--font-num); font-size: 22px; letter-spacing: 0.3em; text-align: center; }
 .check-row { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-2); min-height: 32px; }
 .check-row input { width: 20px; height: 20px; accent-color: var(--ink); flex: none; }
@@ -1276,3 +1284,28 @@ button.card { -webkit-appearance: none; appearance: none; width: 100%; font: inh
 .hrvdet[open] > summary::before { content: "▾ "; }
 .hrvdet .daychart { margin-top: 6px; }
 .hrvdet .ticks { font-variant-numeric: tabular-nums; }
+
+/* Durchschnitt je Sportart und der Verlauf über die Monate */
+.sportsum { display: grid; gap: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface-2); }
+.sportsum .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px 12px; }
+.sportsum .kpis > div { display: grid; gap: 2px; }
+.sportsum .kpis .k { font-size: 11px; color: var(--muted); }
+.sportsum .kpis b { font-size: 15px; }
+.sportsum > .btn { justify-self: start; }
+.sporttrend { display: grid; gap: 4px; }
+.sporttrend .bars { display: flex; align-items: flex-end; gap: 2px; height: 54px; padding: 2px 0; }
+.sporttrend .bar { flex: 1 1 0; min-width: 3px; border-radius: 3px 3px 0 0; background: var(--accent); opacity: 0.45; }
+.sporttrend .bar.jetzt { opacity: 1; }
+.sporttrend .bar.leer { background: var(--line); }
+
+/* Werte aus dem Tagesverlauf ablesen: Zeiger, Linie und Zahl über der Kurve */
+.daychart.lesbar { position: relative; touch-action: pan-y; cursor: crosshair; }
+.daychart.lesbar:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 8px; }
+.daychart .readout {
+  position: absolute; top: 2px; transform: translateX(-50%);
+  display: grid; justify-items: center; gap: 1px; padding: 4px 8px;
+  border-radius: 10px; background: var(--surface); border: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.12); white-space: nowrap; pointer-events: none; z-index: 2;
+}
+.daychart .readout b { font-size: 14px; line-height: 1.1; }
+.daychart .readout span { font-size: 11px; color: var(--muted); }
