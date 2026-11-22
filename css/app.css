@@ -231,7 +231,8 @@ a { color: inherit; }
 .view {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  --gap: 14px;
+  gap: var(--gap);
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   /* Platz unten für Tab-Leiste und den schwebenden Check-in-Knopf */
@@ -1309,3 +1310,59 @@ button.card { -webkit-appearance: none; appearance: none; width: 100%; font: inh
 }
 .daychart .readout b { font-size: 14px; line-height: 1.1; }
 .daychart .readout span { font-size: 11px; color: var(--muted); }
+
+/* Kachelgrößen auf „Heute“ wie auf dem Startbildschirm: klein (halbe Breite,
+   quadratisch), mittel (ganze Breite, gleiche Höhe), groß (ganze Breite, quadratisch).
+   Das Raster hat zwei Spalten; alles andere läuft über beide. */
+.view.kacheln {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  container-type: inline-size;
+}
+.view.kacheln > * { grid-column: span 2; min-width: 0; }
+.view.kacheln > .k-klein { grid-column: span 1; }
+/* Höhe einer kleinen Kachel: halbe Inhaltsbreite abzüglich der halben Lücke.
+   cqw bezieht sich auf die Breite des Rasters, nicht auf die des Fensters. */
+.k-klein, .k-gross { aspect-ratio: 1; }
+.k-mittel { height: calc((100cqw - var(--gap, 14px)) / 2); }
+@supports not (container-type: inline-size) {
+  .k-mittel { height: calc((100vw - 32px - 14px) / 2); }
+}
+.kachel.k-gross { display: grid; }
+.kachel.k-gross > .card { height: 100%; overflow: hidden; }
+
+/* Eine Kachel zeigt einen Wert und ist als Ganzes der Knopf zur vollen Ansicht. */
+.card.tile {
+  -webkit-appearance: none; appearance: none; font: inherit; color: inherit; text-align: left;
+  cursor: pointer; display: grid; grid-template-rows: auto 1fr auto; gap: 2px; padding: 14px;
+  /* eigener Container, damit die Zahl in der kleinen Kachel kleiner ausfällt als in der breiten */
+  container-type: inline-size;
+}
+.card.tile:hover { border-color: var(--ink-2); }
+.tile-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; color: var(--muted); }
+.tile-titel {
+  font-size: 12px; font-weight: 650; letter-spacing: 0.02em; color: var(--ink-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tile-wert { display: flex; align-items: baseline; gap: 3px; align-self: end; }
+.tile-wert b { font-family: var(--font-num); font-size: clamp(26px, 11cqw, 40px); font-weight: 700; line-height: 1; }
+.tile-wert i { font-style: normal; font-size: 13px; color: var(--muted); }
+.tile-wert.c-good b { color: var(--good); }
+.tile-wert.c-warn b { color: var(--warn); }
+.tile-unten { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile-zeile { font-size: 12px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card.tile.k-mittel { grid-template-columns: 1fr auto; grid-template-rows: auto 1fr auto; }
+.card.tile.k-mittel .tile-head { grid-column: 1 / -1; }
+.card.tile.k-mittel .tile-wert { grid-column: 1; }
+.card.tile.k-mittel .tile-unten { grid-column: 1; }
+.card.tile.k-mittel .tile-zeile { grid-column: 2; grid-row: 2 / 4; align-self: end; text-align: right; }
+
+/* Größenwahl je Karte in den Einstellungen */
+.sizepick { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip.tiny { font-size: 12px; padding: 5px 10px; display: inline-flex; align-items: center; gap: 6px; }
+.sizeicon { display: inline-block; border: 1.5px solid currentColor; border-radius: 3px; opacity: 0.7; }
+.sizeicon.s-klein { width: 9px; height: 9px; }
+.sizeicon.s-mittel { width: 16px; height: 9px; }
+.sizeicon.s-gross { width: 14px; height: 14px; }
+.sizeicon.s-voll { width: 16px; height: 6px; border-bottom-style: dashed; }
